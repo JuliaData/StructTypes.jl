@@ -1,5 +1,663 @@
 module StructTypes
 
-greet() = print("Hello World!")
+using UUIDs, Dates
+
+"Abstract super type of various `StructType`s; see `StructTypes.DataType`, `StructTypes.InterfaceType`, and `StructTypes.AbstractType` for more specific kinds of `StructType`s"
+abstract type StructType end
+
+"Default `StructTypes.StructType` for types that don't have a `StructType` defined; this ensures objects must have an explicit `StructType` to avoid unanticipated issues"
+struct NoStructType <: StructType end
+
+"A kind of `StructType` where an object's \"data\" is made up, at least in part, by its direct fields. When serializing, appropriate fields will be accessed directly."
+abstract type DataType <: StructType end
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.Struct()
+
+Signal that `T` can participate in a simplified, performant struct serialization by relying on reliable field order when serializing/deserializing.
+In particular, when deserializing, parsed input fields are passed directly, in input order to the `T` constructor, like `T(field1, field2, field3)`.
+This means that any field names are ignored when deserializing; fields are directly passed to `T` in the order they're encountered.
+
+For example, for reading a `StructTypes.Struct()` from a JSON string input, each key-value pair is read in the order it is encountered in the JSON input, the keys are ignored, and the values are directly passed to the type at the end of the object parsing like `T(val1, val2, val3)`.
+Yes, the JSON specification says that Objects are specifically ***un-ordered*** collections of key-value pairs,
+but the truth is that many JSON libraries provide ways to maintain JSON Object key-value pair order when reading/writing.
+Because of the minimal processing done while parsing, and the "trusting" that the Julia type constructor will be able to handle fields being present, missing, or even extra fields that should be ignored,
+this is the fastest possible method for mapping a JSON input to a Julia structure.
+If your workflow interacts with non-Julia APIs for sending/receiving JSON, you should take care to test and confirm the use of `StructTypes.Struct()` in the cases mentioned above: what if a field is missing when parsing? what if the key-value pairs are out of order? what if there extra fields get included that weren't anticipated? If your workflow is questionable on these points, or it would be too difficult to account for these scenarios in your type constructor, it would be better to consider the `StructTypes.Mutable()` option.
+
+```@example
+struct CoolType
+    val1::Int
+    val2::Int
+    val3::String
+end
+
+StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
+
+# StructTypes package as example
+@assert StructTypes.read("{\"val1\": 1, \"val2\": 2, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
+# note how `val2` field is first, then `val1`, but fields are passed *in-order* to `CoolType` constructor; BE CAREFUL!
+@assert StructTypes.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(2, 1, "3")
+```
+"""
+struct Struct <: DataType end
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.Mutable()
+
+Signal that `T` is a mutable struct with an empty constructor for serializing/deserializing.
+Though slightly less performant than `StructTypes.Struct`, `Mutable` is a much more robust method for mapping Julia struct fields for serialization. This technique requires your Julia type to be defined, ***at a minimum***, like:
+```julia
+mutable struct T
+    field1
+    field2
+    field3
+    # etc.
+
+    T() = new()
+end
+```
+Note specifically that we're defining a `mutable struct` to allow field mutation, and providing a `T() = new()` inner constructor which constructs an "empty" `T` where `isbitstype` fields will be randomly initialized, and reference fields will be `#undef`. (Note that the inner constructor doesn't need to be ***exactly*** this, but at least needs to be callable like `T()`. If certain fields need to be intialized or zeroed out for security, then this should be accounted for in the inner constructor). For these mutable types, the type will first be initizlied like `T()`, then serialization will take each key-value input pair, setting the field as the key is encountered, and converting the value to the appropriate field value. This flow has the nice properties of: allowing object construction success even if fields are missing in the input, and if "extra" fields exist in the input that aren't apart of the Julia struct's fields, they will automatically be ignored. This allows for maximum robustness when mapping Julia types to arbitrary data foramts that may be generated via web services, databases, other language libraries, etc.
+
+There are a few additional helper methods that can be utilized by `StructTypes.Mutable()` types to hand-tune field reading/writing behavior:
+
+* `StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))`: provides a mapping of Julia field name to expected serialized object key name. This affects both serializing and deserializing. When deserializing the `serializedfield1` key, the `juliafield1` field of `T` will be set. When serializing the `juliafield2` field of `T`, the output key will be `serializedfield2`. Field name mappings are provided as a `Tuple` of `Tuple{Symbol, Symbol}`s, i.e. each field mapping is a Julia field name `Symbol` (first) and serialized field name `Symbol` (second).
+* `StructTypes.excludes(::Type{T}) = (:field1, :field2)`: specify fields of `T` to ignore when serializing and deserializing, provided as a `Tuple` of `Symbol`s. When deserializing, if `field1` is encountered as an input key, it's value will be read, but the field will not be set in `T`. When serializing, `field1` will be skipped when serializing out `T` fields as key-value pairs.
+* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+* `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to the constructor method of the field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
+"""
+struct Mutable <: DataType end
+
+StructType(u::Union) = Struct()
+StructType(::Type{Any}) = Struct()
+StructType(::Type{T}) where {T} = NoStructType()
+StructType(x::T) where {T} = StructType(T)
+
+"""
+    StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))
+
+Provides a mapping of Julia field name to expected serialized object key name.
+This affects both reading and writing.
+When reading the `serializedfield1` key, the `juliafield1` field of `T` will be set.
+When writing the `juliafield2` field of `T`, the output key will be `serializedfield2`.
+"""
+function names end
+
+names(x::T) where {T} = names(T)
+names(::Type{T}) where {T} = ()
+
+Base.@pure function julianame(names::Tuple{Vararg{Tuple{Symbol, Symbol}}}, serializationname::Symbol)
+    for nm in names
+        nm[2] === serializationname && return nm[1]
+    end
+    return serializationname
+end
+
+Base.@pure function serializationname(names::Tuple{Vararg{Tuple{Symbol, Symbol}}}, julianame::Symbol)
+    for nm in names
+        nm[1] === julianame && return nm[2]
+    end
+    return julianame
+end
+
+"""
+    StructTypes.excludes(::Type{T}) = (:field1, :field2)
+
+Specify for a `StructTypes.Mutable` `StructType` the fields, given as a `Tuple` of `Symbol`s, that should be ignored when deserializing, and excluded from serializing.
+"""
+function excludes end
+
+excludes(x::T) where {T} = excludes(T)
+excludes(::Type{T}) where {T} = ()
+
+"""
+    StructTypes.omitempties(::Type{T}) = (:field1, :field2)
+
+Specify for a `StructTypes.Mutable` `StructType` the fields, given as a `Tuple` of `Symbol`s, that should not be serialized if they're considered "empty".
+If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+"""
+function omitempties end
+
+omitempties(x::T) where {T} = omitempties(T)
+omitempties(::Type{T}) where {T} = ()
+
+function isempty end
+
+isempty(x::Union{AbstractDict, AbstractArray, AbstractString, Tuple, NamedTuple}) = Base.isempty(x)
+isempty(::Number) = false
+isempty(::Nothing) = true
+isempty(x) = false
+
+"""
+    StructTypes.keywordargs(::Type{MyType}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))
+
+Specify for a `StructTypes.Mutable` the keyword arguments by field, given as a `NamedTuple` of `NamedTuple`s, that should be passed
+to the `StructTypes.construct` method when deserializing `MyType`. This essentially allows defining specific keyword arguments you'd like to be passed for each field
+in your struct. Note that keyword arguments can be passed when reading, like `JSON3.read(source, MyType; dateformat=...)` and they will be passed down to each `StructTypes.construct` method.
+`StructTypes.keywordargs` just allows the defining of specific keyword arguments per field.
+"""
+function keywordargs end
+
+keywordargs(x::T) where {T} = keywordargs(T)
+keywordargs(::Type{T}) where {T} = NamedTuple()
+
+"""
+    StructTypes.idproperty(::Type{MyType}) = :id
+
+Specify which field of a type uniquely identifies it. The unique identifier field name is given as a Symbol.
+Useful in database applications where the id field can be used to distinguish separate objects.
+"""
+function idproperty end
+
+idproperty(x::T) where {T} = idproperty(T)
+idproperty(::Type{T}) where {T} = :_
+
+"""
+    StructTypes.fieldprefix(::Type{MyType}) = :mytype_
+
+When interacting with database tables and other strictly 2D data formats, objects with aggregate fields
+must be flattened into a single set of column names. When deserializing a set of columns into an
+object with aggregate fields, a field type's `fieldprefix` signals that column names beginning with, in
+the example above, `:mytype_`, should be collected together when constructing `MyType`.
+
+Here's a more concrete, albeit contrived, example:
+```julia
+struct Spouse
+    id::Int
+    name::String
+end
+
+StructTypes.StructType(::Type{Spouse}) = StructTypes.Struct()
+StructTypes.fieldprefix(::Type{Spouse}) = :spouse_
+
+struct Person
+    id::Int
+    name::String
+    spouse::Person
+end
+
+StructTypes.StructType(::Type{Person}) = StructTypes.Struct()
+```
+Here we have two structs, `Spouse` and `Person`, and a `Person` has a `spouse::Spouse`.
+The database tables to represent these entities might look like:
+```SQL
+CREATE TABLE spouse (id INT, name VARCHAR);
+CREATE TABLE person (id INT, name VARCHAR, spouse_id INT);
+```
+If we want to leverage a package like ORM.jl to automatically handle the object construction
+for us, we could write a get query like the following to ensure a full `Person` with field `spouse::Spouse`
+can be constructed:
+```julia
+getPerson(id::Int) = ORM.select(db,
+    \"\"\"
+        SELECT person.id as id, person.name as name, spouse.id as spouse_id, spouse.name as spouse_name
+        FROM person
+        LEFT JOIN spouse ON person.spouse_id = spouse.id
+        WHERE person.id = \$id
+    \"\"\", Person)
+```
+This works because the column names in the resultset of this query are "id, name, spouse_id, spouse_name";
+because we defined `StructTypes.fieldprefix(::Type{Spouse}) = :spouse_`, ORM.jl knows that each
+column starting with "spouse_" should be used in constructing `Spouse` instead of `Person`.
+"""
+function fieldprefix end
+
+"""
+    StructTypes.InterfaceType
+
+An abstract type used in the API for "interface types" to map Julia types to a "standard" set of common types. See docs for the following concrete subtypes for more details:
+
+  * StructTypes.DictType
+  * StructTypes.ArrayType
+  * StructTypes.StringType
+  * StructTypes.NumberType
+  * StructTypes.BoolType
+  * StructTypes.NullType
+"""
+abstract type InterfaceType end
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.DictType()
+
+Declare that `T` should map to a dict-like object of unordered key-value pairs, where keys are `Symbol`, `String`, or `Int64`, and values are any other type (or `Any`).
+
+Types already declared as `StructTypes.DictType()` include:
+  * Any subtype of `AbstractDict`
+  * Any `NamedTuple` type
+  * The `Pair` type
+
+So if your type subtypes `AbstractDict` and implements its interface, then it will inherit the `DictType` definition and serializing/deserializing should work automatically.
+
+Otherwise, the interface to satisfy `StructTypes.DictType()` for deserializing is:
+
+  * `T(x::Dict{Symbol, Any})`: implement a constructor that takes a `Dict{Symbol, Any}` of input key-value pairs
+  * `StructTypes.construct(::Type{T}, x::Dict; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor is undesirable (or would cause other clashes or ambiguities)
+
+The interface to satisfy for serializing is:
+
+  * `pairs(x)`: implement the `pairs` iteration function (from Base) to iterate key-value pairs to be serialized
+  * `StructTypes.keyvaluepairs(x::T)`: alternatively, you can overload the `StructTypes.keyvaluepairs` function if overloading `pairs` isn't possible for whatever reason
+"""
+struct DictType <: InterfaceType end
+
+StructType(::Type{<:AbstractDict}) = DictType()
+StructType(::Type{<:NamedTuple}) = DictType()
+StructType(::Type{<:Pair}) = DictType()
+
+keyvaluepairs(x) = pairs(x)
+keyvaluepairs(x::Pair) = (x,)
+
+construct(::Type{Dict{K, V}}, x::Dict{K, V}; kw...) where {K, V} = x
+construct(T, x::Dict{K, V}; kw...) where {K, V} = T(x)
+
+construct(::Type{NamedTuple}, x::Dict; kw...) = NamedTuple{Tuple(keys(x))}(values(x))
+construct(::Type{NamedTuple{names}}, x::Dict; kw...) where {names} = NamedTuple{names}(Tuple(x[nm] for nm in names))
+construct(::Type{NamedTuple{names, types}}, x::Dict; kw...) where {names, types} = NamedTuple{names, types}(Tuple(x[nm] for nm in names))
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.ArrayType()
+
+Declare that `T` should map to an array of ordered elements, homogenous or otherwise.
+
+Types already declared as `StructTypes.ArrayType()` include:
+  * Any subtype of `AbstractArray`
+  * Any subtype of `AbstractSet`
+  * Any `Tuple` type
+
+So if your type already subtypes these and satifies their interface, things should just work.
+
+Otherwise, the interface to satisfy `StructTypes.ArrayType()` for deserializing is:
+
+  * `T(x::Vector)`: implement a constructor that takes a `Vector` argument of values and constructs a `T`
+  * `StructTypes.construct(::Type{T}, x::Vecto; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor isn't possible
+  * Optional: `Base.IteratorEltype(::Type{T}) = Base.HasEltype()` and `Base.eltype(x::T)`: this can be used to signal that elements for your type are expected to be a homogenous type
+
+The interface to satisfy for serializing is:
+
+  * `iterate(x::T)`: just iteration over each element is required; note if you subtype `AbstractArray` and define `getindex(x::T, i::Int)`, then iteration is inherited for your type
+"""
+struct ArrayType <: InterfaceType end
+
+StructType(::Type{<:AbstractArray}) = ArrayType()
+StructType(::Type{<:AbstractSet}) = ArrayType()
+StructType(::Type{<:Tuple}) = ArrayType()
+
+construct(T, x::Vector{S}; kw...) where {S} = T(x)
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.StringType()
+
+Declare that `T` should map to a string value.
+
+Types already declared as `StructTypes.StringType()` include:
+  * Any subtype of `AbstractString`
+  * The `Symbol` type
+  * Any subtype of `Enum` (values are written with their symbolic name)
+  * Any subtype of `AbstractChar`
+  * The `UUID` type
+  * Any `Dates.TimeType` subtype (`Date`, `DateTime`, `Time`, etc.)
+
+So if your type is an `AbstractString` or `Enum`, then things should already work.
+
+Otherwise, the interface to satisfy `StructTypes.StringType()` for deserializing is:
+
+  * `T(x::String)`: define a constructor for your type that takes a single String argument
+  * `StructTypes.construct(::Type{T}, x::String; kw...)`: alternatively, you may overload `StructTypes.construct` for your type
+  * `StructTypes.construct(::Type{T}, ptr::Ptr{UInt8}, len::Int; kw...)`: another option is to overload `StructTypes.construct` with pointer and length arguments, if it's possible for your custom type to take advantage of avoiding the full string materialization; note that your type should implement both `StructTypes.construct` methods, since direct pointer/length deserialization may not be possible for some inputs
+
+The interface to satisfy for serializing is:
+
+  * `Base.string(x::T)`: overload `Base.string` for your type to return a "stringified" value, or more specifically, that returns an `AbstractString`, and should implement `ncodeunits(x)` and `codeunit(x, i)`.
+"""
+struct StringType <: InterfaceType end
+
+StructType(::Type{<:AbstractString}) = StringType()
+StructType(::Type{Symbol}) = StringType()
+StructType(::Type{<:Enum}) = StringType()
+StructType(::Type{<:AbstractChar}) = StringType()
+StructType(::Type{UUID}) = StringType()
+StructType(::Type{T}) where {T <: Dates.TimeType} = StringType()
+
+function construct(::Type{Char}, str::String; kw...)
+    if length(str) == 1
+        return Char(str[1])
+    else
+        throw(ArgumentError("invalid conversion from string to Char: '$str'"))
+    end
+end
+
+_symbol(ptr, len) = ccall(:jl_symbol_n, Ref{Symbol}, (Ptr{UInt8}, Int), ptr, len)
+
+function construct(::Type{E}, ptr::Ptr{UInt8}, len::Int) where {E <: Enum}
+    @static if VERSION < v"1.2.0-DEV.272"
+        Core.eval(parentmodule(E), _symbol(ptr, len))
+    else
+        sym = _symbol(ptr, len)
+        for (k, v) in Base.Enums.namemap(E)
+            sym == v && return E(k)
+        end
+        throw(ArgumentError("invalid $E string value: \"$(unsafe_string(ptr, len))\""))
+    end
+end
+
+construct(T, str::String; kw...) = T(str)
+construct(T, ptr::Ptr{UInt8}, len::Int; kw...) = construct(T, unsafe_string(ptr, len); kw...)
+construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
+construct(::Type{T}, str::String; dateformat::Dates.DateFormat=Dates.default_format(T), kw...) where {T <: Dates.TimeType} = T(str, dateformat)
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.NumberType()
+
+Declare that `T` should map to a number value.
+
+Types already declared as `StructTypes.NumberType()` include:
+  * Any subtype of `Signed`
+  * Any subtype of `Unsigned`
+  * Any subtype of `AbstractFloat`
+
+In addition to declaring `StructTypes.NumberType()`, custom types can also specify a specific, ***existing*** number type it should map to. It does this like:
+```julia
+StructTypes.numbertype(::Type{T}) = Float64
+```
+
+In this case, `T` declares it should map to an already-supported number type: `Float64`. This means that when deserializing, an input will be parsed/read/deserialiezd as a `Float64` value, and then call `T(x::Float64)`. Note that custom types may also overload `StructTypes.construct(::Type{T}, x::Float64; kw...)` if using a constructor isn't possible. Also note that the default for any type declared as `StructTypes.NumberType()` is `Float64`.
+
+Similarly for serializing, `Float64(x::T)` will first be called before serializing the resulting `Float64` value.
+"""
+struct NumberType <: InterfaceType end
+
+StructType(::Type{<:Unsigned}) = NumberType()
+StructType(::Type{<:Signed}) = NumberType()
+StructType(::Type{<:AbstractFloat}) = NumberType()
+numbertype(::Type{T}) where {T <: Real} = T
+numbertype(x) = Float64
+construct(T, x::Real; kw...) = T(x)
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.BoolType()
+
+Declare that `T` should map to a boolean value.
+
+Types already declared as `StructTypes.BoolType()` include:
+  * `Bool`
+
+The interface to satisfy for deserializing is:
+  * `T(x::Bool)`: define a constructor that takes a single `Bool` value
+  * `StructTypes.construct(::Type{T}, x::Bool; kw...)`: alternatively, you may overload `StructTypes.construct`
+
+The interface to satisfy for serializing is:
+  * `Bool(x::T)`: define a conversion to `Bool` method
+"""
+struct BoolType <: InterfaceType end
+
+StructType(::Type{Bool}) = BoolType()
+construct(T, bool::Bool; kw...) = T(bool)
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.NullType()
+
+Declare that `T` should map to a "null" value.
+
+Types already declared as `StructTypes.NullType()` include:
+  * `nothing`
+  * `missing`
+
+The interface to satisfy for serializing is:
+  * `T()`: an empty constructor for `T`
+  * `StructTypes.construct(::Type{T}, x::Nothing; kw...)`: alternatively, you may overload `StructTypes.construct`
+
+There is no interface for serializing; if a custom type is declared as `StructTypes.NullType()`, then serializing will be handled specially; writing `null` in JSON, `NULL` in SQL, etc.
+"""
+struct NullType <: InterfaceType end
+
+StructType(::Type{Nothing}) = NullType()
+StructType(::Type{Missing}) = NullType()
+construct(T, ::Nothing; kw...) = T()
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.AbstractType()
+
+Signal that `T` is an abstract type, and when deserializing, one of its concrete subtypes will be materialized,
+based on a "type" key/field in the serialization object.
+
+Thus, `StructTypes.AbstractType`s *must* define `StructTypes.subtypes`, which should be a NamedTuple with subtype keys mapping to concrete Julia subtype values. You may optionally define `StructTypes.subtypekey` that indicates which input key/field name should be used for identifying the appropriate concrete subtype. A quick example should help illustrate proper use of this `StructType`:
+```julia
+abstract type Vehicle end
+
+struct Car <: Vehicle
+    type::String
+    make::String
+    model::String
+    seatingCapacity::Int
+    topSpeed::Float64
+end
+
+struct Truck <: Vehicle
+    type::String
+    make::String
+    model::String
+    payloadCapacity::Float64
+end
+
+StructTypes.StructType(::Type{Vehicle}) = StructTypes.AbstractType()
+StructTypes.StructType(::Type{Car}) = StructTypes.Struct()
+StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
+StructTypes.subtypekey(::Type{Vehicle}) = :type
+StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
+
+# example from StructTypes deserialization
+car = StructTypes.read(\"\"\"
+{
+    "type": "car",
+    "make": "Mercedes-Benz",
+    "model": "S500",
+    "seatingCapacity": 5,
+    "topSpeed": 250.1
+}\"\"\", Vehicle)
+```
+Here we have a `Vehicle` type that is defined as a `StructTypes.AbstractType()`.
+We also have two concrete subtypes, `Car` and `Truck`. In addition to the `StructType` definition,
+we also define `StructTypes.subtypekey(::Type{Vehicle}) = :type`, which signals that when deserializing,
+when it encounters the `type` key, it should use the ***value***, in the above example: `car`,
+to discover the appropriate concrete subtype to parse the structure as, in this case `Car`.
+The mapping of subtype key value to concrete Julia subtype is defined in our example via
+`StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)`.
+Thus, `StructTypes.AbstractType` is useful when the object to deserialize includes a "subtype"
+key-value pair that can be used to parse a specific, concrete type; in our example,
+parsing the structure as a `Car` instead of a `Truck`.
+"""
+struct AbstractType <: StructType end
+
+subtypekey(x::T) where {T} = subtypekey(T)
+subtypekey(::Type{T}) where {T} = :type
+subtypes(x::T) where {T} = subtypes(T)
+subtypes(::Type{T}) where {T} = NamedTuple()
+
+# helper functions for type-stable reflection while operating on struct fields
+
+"""
+    StructTypes.construct(f, T) => T
+
+Apply function `f(i, name, FT)` over each field index `i`, field name `name`, and field type `FT`
+of type `T`, passing the function results to `T` for construction, like `T(x_1, x_2, ...)`.
+"""
+@inline function construct(f, ::Type{T}) where {T}
+    N = fieldcount(T)
+    constructor = T <: Tuple ? tuple : T
+    # unroll first 32 fields
+    Base.@nexprs 32 i -> begin
+        x_i = f(i, fieldname(T, i), fieldtype(T, i))
+        if N == i
+            return Base.@ncall(i, constructor, x)
+        end
+    end
+    vals = []
+    for i = 33:N
+        x = f(i, fieldname(T, i), fieldtype(T, i))
+        push!(vals, x)
+    end
+    return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,
+             x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
+end
+
+Base.@pure function symbolin(names::Tuple{Vararg{Symbol}}, name::Symbol)
+    for nm in names
+        nm === name && return true
+    end
+    return false
+end
+
+"""
+    StructTypes.foreachfield(f, x::T) => Nothing
+
+Apply function `f(i, name, FT, v)` over each field index `i`, field name `name`, field type `FT`,
+and field value `v` in `x`. Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` over collections.
+
+Various "configurations" are respected when applying `f` to each field:
+  * If keyword arguments have been defined for a field via `StructTypes.keywordargs`, they will be passed like `f(i, name, FT, v; kw...)`
+  * If `StructTypes.names` has been defined, `name` will be the serialization name instead of the defined julia field name
+  * If a field is undefined or empty and `StructTypes.omitempties` is defined, `f` won't be applied to that field
+  * If a field has been excluded via `StructTypes.excludes`, it will be skipped
+"""
+@inline function foreachfield(f, x::T) where {T}
+    N = fieldcount(T)
+    excl = excludes(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    emp = omitempties(T)
+    Base.@nexprs 32 i -> begin
+        k_i = fieldname(T, i)
+        if !symbolin(excl, k_i) && isdefined(x, i)
+            v_i = Core.getfield(x, i)
+            if !symbolin(emp, k_i) || !isempty(x, i)
+                if haskey(kwargs, k_i)
+                    f(i, serializationname(nms, k_i), fieldtype(T, i), v_i; kwargs[k_i]...)
+                else
+                    f(i, serializationname(nms, k_i), fieldtype(T, i), v_i)
+                end
+            end
+        end
+        N == i && @goto done
+    end
+    if N > 32
+        for i = 33:N
+            k_i = fieldname(T, i)
+            if !symbolin(excl, k_i) && isdefined(x, i)
+                v_i = Core.getfield(x, i)
+                if !symbolin(emp, k_i) || !isempty(x, i)
+                    if haskey(kwargs, k_i)
+                        f(i, serializationname(nms, k_i), fieldtype(T, i), v_i; kwargs[k_i]...)
+                    else
+                        f(i, serializationname(nms, k_i), fieldtype(T, i), v_i)
+                    end
+                end
+            end
+        end
+    end
+
+@label done
+    return
+end
+
+"""
+    StructTypes.mapfields!(f, x::T)
+
+Applys the function `f(i, name, FT)` to each field index `i`, field name `name`, and field type `FT`
+of `x`, and calls `setfield!(x, name, y)` where `y` is returned from `f`.
+
+This is a convenience function for working with `StructTypes.Mutable`, where a function can be
+applied over the fields of the mutable struct to set each field value. It respects the various
+StructTypes configurations in terms of skipping/naming/passing keyword arguments as defined.
+"""
+@inline function mapfields!(f, x::T) where {T}
+    N = fieldcount(T)
+    excl = excludes(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    emp = omitempties(T)
+    Base.@nexprs 32 i -> begin
+        k_i = fieldname(T, i)
+        if !symbolin(excl, k_i)
+            if !symbolin(emp, k_i) || !isempty(x, i)
+                if haskey(kwargs, k_i)
+                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
+                else
+                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
+                end
+            end
+        end
+        N == i && @goto done
+    end
+    if N > 32
+        for i = 33:N
+            k_i = fieldname(T, i)
+            if !symbolin(excl, k_i)
+                if !symbolin(emp, k_i) || !isempty(x, i)
+                    if haskey(kwargs, k_i)
+                        setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
+                    else
+                        setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
+                    end
+                end
+            end
+        end
+    end
+
+@label done
+    return
+end
+
+"""
+    StructTypes.applyfield!(f, x::T, nm::Symbol) => Bool
+
+Convenience function for working with a `StructTypes.Mutable` object. For a given field name `nm`,
+apply the function `f(i, name, FT)` to the field index `i`, field name `name`, and field type `FT`,
+setting the field value to the return value of `f`. Various StructType configurations are respected
+like keyword arguments, names, and exclusions. `applyfield!` returns whether `f` was executed
+or not; if `nm` isn't a valid field name on `x`, `false` will be returned (important for
+applications where the input still needs to consume the field, like json parsing).
+"""
+@inline function applyfield!(f, x::T, nm::Symbol) where {T}
+    N = fieldcount(T)
+    excl = excludes(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    nm = julianame(nms, nm)
+    f_applied = false
+    # unroll the first 32 field checks to avoid dynamic dispatch if possible
+    Base.@nif(
+        32,
+        i -> (i <= N && fieldname(T, i) === nm),
+        i -> begin
+            FT_i = fieldtype(T, i)
+            if isempty(kwargs)
+                y_i = f(i, nm, FT_i)
+            else
+                y_i = f(i, nm, FT_i; kwargs[nm]...)
+            end
+            if !symbolin(excl, nm)
+                setfield!(x, i, y_i)
+            end
+            f_applied = true
+        end,
+        i -> begin
+            for j in 33:N
+                fieldname(T, j) === nm || continue
+                FT_j = fieldtype(T, j)
+                if isempty(kwargs)
+                    y_j = f(j, nm, FT_j)
+                else
+                    y_j = f(j, nm, FT_j; kwargs[nm]...)
+                end
+                if !symbolin(excl, nm)
+                    setfield!(x, j, y_j)
+                end
+                f_applied = true
+                break
+            end
+        end
+    )
+    return f_applied
+end
 
 end # module
