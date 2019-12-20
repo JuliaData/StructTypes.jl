@@ -6,12 +6,12 @@ makedocs(;
     pages=[
         "Home" => "index.md",
     ],
-    repo="https://github.com/quinnj/StructTypes.jl/blob/{commit}{path}#L{line}",
+    repo="https://github.com/JuliaData/StructTypes.jl/blob/{commit}{path}#L{line}",
     sitename="StructTypes.jl",
     authors="Jacob Quinn",
     assets=String[],
 )
 
 deploydocs(;
-    repo="github.com/quinnj/StructTypes.jl",
+    repo="github.com/JuliaData/StructTypes.jl",
 )
