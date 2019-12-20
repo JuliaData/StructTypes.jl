@@ -127,6 +127,7 @@ isempty(x::Union{AbstractDict, AbstractArray, AbstractString, Tuple, NamedTuple}
 isempty(::Number) = false
 isempty(::Nothing) = true
 isempty(x) = false
+isempty(x, i) = isempty(Core.getfield(x, i))
 
 """
     StructTypes.keywordargs(::Type{MyType}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))
@@ -328,15 +329,17 @@ end
 
 _symbol(ptr, len) = ccall(:jl_symbol_n, Ref{Symbol}, (Ptr{UInt8}, Int), ptr, len)
 
-function construct(::Type{E}, ptr::Ptr{UInt8}, len::Int) where {E <: Enum}
+construct(::Type{E}, ptr::Ptr{UInt8}, len::Int) where {E <: Enum} = construct(E, _symbol(ptr, len))
+construct(::Type{E}, str::String) where {E <: Enum} = construct(E, Symbol(str))
+
+function construct(::Type{E}, sym::Symbol) where {E <: Enum}
     @static if VERSION < v"1.2.0-DEV.272"
-        Core.eval(parentmodule(E), _symbol(ptr, len))
+        Core.eval(parentmodule(E), sym)
     else
-        sym = _symbol(ptr, len)
         for (k, v) in Base.Enums.namemap(E)
             sym == v && return E(k)
         end
-        throw(ArgumentError("invalid $E string value: \"$(unsafe_string(ptr, len))\""))
+        throw(ArgumentError("invalid $E string value: \"$sym\""))
     end
 end
 
@@ -480,21 +483,34 @@ subtypes(::Type{T}) where {T} = NamedTuple()
 
 Apply function `f(i, name, FT)` over each field index `i`, field name `name`, and field type `FT`
 of type `T`, passing the function results to `T` for construction, like `T(x_1, x_2, ...)`.
+Note that any `StructTypes.names` mappings are applied, as well as field-specific keyword arguments via `StructTypes.keywordargs`.
 """
 @inline function construct(f, ::Type{T}) where {T}
     N = fieldcount(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
     constructor = T <: Tuple ? tuple : T
     # unroll first 32 fields
     Base.@nexprs 32 i -> begin
-        x_i = f(i, fieldname(T, i), fieldtype(T, i))
+        k_i = fieldname(T, i)
+        if haskey(kwargs, k_i)
+            x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
+        else
+            x_i = f(i, serializationname(nms, k_i), fieldtype(T, i))
+        end
         if N == i
             return Base.@ncall(i, constructor, x)
         end
     end
     vals = []
     for i = 33:N
-        x = f(i, fieldname(T, i), fieldtype(T, i))
-        push!(vals, x)
+        k_i = fieldname(T, i)
+        if haskey(kwargs, k_i)
+            x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
+        else
+            x_i = f(i, serializationname(nms, k_i), fieldtype(T, i))
+        end
+        push!(vals, x_i)
     end
     return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,
              x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
@@ -574,16 +590,13 @@ StructTypes configurations in terms of skipping/naming/passing keyword arguments
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)
-    emp = omitempties(T)
     Base.@nexprs 32 i -> begin
         k_i = fieldname(T, i)
         if !symbolin(excl, k_i)
-            if !symbolin(emp, k_i) || !isempty(x, i)
-                if haskey(kwargs, k_i)
-                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
-                else
-                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
-                end
+            if haskey(kwargs, k_i)
+                setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
+            else
+                setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
             end
         end
         N == i && @goto done
@@ -592,12 +605,10 @@ StructTypes configurations in terms of skipping/naming/passing keyword arguments
         for i = 33:N
             k_i = fieldname(T, i)
             if !symbolin(excl, k_i)
-                if !symbolin(emp, k_i) || !isempty(x, i)
-                    if haskey(kwargs, k_i)
-                        setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
-                    else
-                        setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
-                    end
+                if haskey(kwargs, k_i)
+                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...))
+                else
+                    setfield!(x, k_i, f(i, serializationname(nms, k_i), fieldtype(T, i)))
                 end
             end
         end
@@ -610,12 +621,14 @@ end
 """
     StructTypes.applyfield!(f, x::T, nm::Symbol) => Bool
 
-Convenience function for working with a `StructTypes.Mutable` object. For a given field name `nm`,
+Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
 apply the function `f(i, name, FT)` to the field index `i`, field name `name`, and field type `FT`,
 setting the field value to the return value of `f`. Various StructType configurations are respected
 like keyword arguments, names, and exclusions. `applyfield!` returns whether `f` was executed
 or not; if `nm` isn't a valid field name on `x`, `false` will be returned (important for
 applications where the input still needs to consume the field, like json parsing).
+Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
+mappings will be applied, and the function will be passed the Julia field name.
 """
 @inline function applyfield!(f, x::T, nm::Symbol) where {T}
     N = fieldcount(T)
@@ -627,31 +640,27 @@ applications where the input still needs to consume the field, like json parsing
     # unroll the first 32 field checks to avoid dynamic dispatch if possible
     Base.@nif(
         32,
-        i -> (i <= N && fieldname(T, i) === nm),
+        i -> (i <= N && fieldname(T, i) === nm && !symbolin(excl, nm)),
         i -> begin
             FT_i = fieldtype(T, i)
-            if isempty(kwargs)
-                y_i = f(i, nm, FT_i)
-            else
+            if haskey(kwargs, nm)
                 y_i = f(i, nm, FT_i; kwargs[nm]...)
+            else
+                y_i = f(i, nm, FT_i)
             end
-            if !symbolin(excl, nm)
-                setfield!(x, i, y_i)
-            end
+            setfield!(x, i, y_i)
             f_applied = true
         end,
         i -> begin
             for j in 33:N
-                fieldname(T, j) === nm || continue
+                (fieldname(T, j) === nm && !symbolin(excl, nm)) || continue
                 FT_j = fieldtype(T, j)
-                if isempty(kwargs)
-                    y_j = f(j, nm, FT_j)
-                else
+                if haskey(kwargs, nm)
                     y_j = f(j, nm, FT_j; kwargs[nm]...)
+                else
+                    y_j = f(j, nm, FT_j)
                 end
-                if !symbolin(excl, nm)
-                    setfield!(x, j, y_j)
-                end
+                setfield!(x, j, y_j)
                 f_applied = true
                 break
             end
