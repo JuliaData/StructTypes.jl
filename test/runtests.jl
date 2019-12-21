@@ -37,6 +37,7 @@ end
 @test !StructTypes.isempty(1)
 @test StructTypes.isempty(nothing)
 @test !StructTypes.isempty(A(1))
+@test !StructTypes.isempty(A(1), 1)
 
 @test StructTypes.keywordargs(A) == NamedTuple()
 @test StructTypes.keywordargs(A(1)) == NamedTuple()
@@ -51,7 +52,7 @@ end
 x = Dict(1 => 2)
 @test StructTypes.keyvaluepairs(x) == pairs(x)
 x = 1 => 2
-@test StructTypes.keyvaluepairs(x) == pairs(x)
+@test StructTypes.keyvaluepairs(x) == (x,)
 
 x = Dict(:hey => 2)
 @test StructTypes.construct(typeof(x), x) === x

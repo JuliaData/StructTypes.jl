@@ -492,7 +492,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
     constructor = T <: Tuple ? tuple : T
     # unroll first 32 fields
     Base.@nexprs 32 i -> begin
-        k_i = fieldname(T, i)
+        k_i = Symbol(fieldname(T, i))
         if haskey(kwargs, k_i)
             x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
         else
@@ -504,7 +504,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
     end
     vals = []
     for i = 33:N
-        k_i = fieldname(T, i)
+        k_i = Symbol(fieldname(T, i))
         if haskey(kwargs, k_i)
             x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
         else
