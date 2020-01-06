@@ -93,12 +93,16 @@ Base.@pure function julianame(names::Tuple{Vararg{Tuple{Symbol, Symbol}}}, seria
     return serializationname
 end
 
+Base.@pure julianame(names::Tuple{}, serializationname::Int) = serializationname
+
 Base.@pure function serializationname(names::Tuple{Vararg{Tuple{Symbol, Symbol}}}, julianame::Symbol)
     for nm in names
         nm[1] === julianame && return nm[2]
     end
     return julianame
 end
+
+Base.@pure serializationname(names::Tuple{}, julianame::Int) = julianame
 
 """
     StructTypes.excludes(::Type{T}) = (:field1, :field2)
@@ -492,7 +496,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
     constructor = T <: Tuple ? tuple : T
     # unroll first 32 fields
     Base.@nexprs 32 i -> begin
-        k_i = Symbol(fieldname(T, i))
+        k_i = fieldname(T, i)
         if haskey(kwargs, k_i)
             x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
         else
@@ -504,7 +508,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
     end
     vals = []
     for i = 33:N
-        k_i = Symbol(fieldname(T, i))
+        k_i = fieldname(T, i)
         if haskey(kwargs, k_i)
             x_i = f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
         else
