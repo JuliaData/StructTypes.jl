@@ -189,11 +189,11 @@ The database tables to represent these entities might look like:
 CREATE TABLE spouse (id INT, name VARCHAR);
 CREATE TABLE person (id INT, name VARCHAR, spouse_id INT);
 ```
-If we want to leverage a package like ORM.jl to automatically handle the object construction
+If we want to leverage a package like Strapping.jl to automatically handle the object construction
 for us, we could write a get query like the following to ensure a full `Person` with field `spouse::Spouse`
 can be constructed:
 ```julia
-getPerson(id::Int) = ORM.select(db,
+getPerson(id::Int) = Strapping.select(db,
     \"\"\"
         SELECT person.id as id, person.name as name, spouse.id as spouse_id, spouse.name as spouse_name
         FROM person
@@ -202,7 +202,7 @@ getPerson(id::Int) = ORM.select(db,
     \"\"\", Person)
 ```
 This works because the column names in the resultset of this query are "id, name, spouse_id, spouse_name";
-because we defined `StructTypes.fieldprefix(::Type{Spouse}) = :spouse_`, ORM.jl knows that each
+because we defined `StructTypes.fieldprefix(::Type{Spouse}) = :spouse_`, Strapping.jl knows that each
 column starting with "spouse_" should be used in constructing `Spouse` instead of `Person`.
 """
 function fieldprefix end
