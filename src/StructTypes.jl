@@ -34,10 +34,10 @@ end
 
 StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 
-# StructTypes package as example
-@assert StructTypes.read("{\"val1\": 1, \"val2\": 2, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
+# JSON3 package as example
+@assert JSON3.read("{\"val1\": 1, \"val2\": 2, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
 # note how `val2` field is first, then `val1`, but fields are passed *in-order* to `CoolType` constructor; BE CAREFUL!
-@assert StructTypes.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(2, 1, "3")
+@assert JSON3.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(2, 1, "3")
 ```
 """
 struct Struct <: DataType end
@@ -64,7 +64,7 @@ There are a few additional helper methods that can be utilized by `StructTypes.M
 * `StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))`: provides a mapping of Julia field name to expected serialized object key name. This affects both serializing and deserializing. When deserializing the `serializedfield1` key, the `juliafield1` field of `T` will be set. When serializing the `juliafield2` field of `T`, the output key will be `serializedfield2`. Field name mappings are provided as a `Tuple` of `Tuple{Symbol, Symbol}`s, i.e. each field mapping is a Julia field name `Symbol` (first) and serialized field name `Symbol` (second).
 * `StructTypes.excludes(::Type{T}) = (:field1, :field2)`: specify fields of `T` to ignore when serializing and deserializing, provided as a `Tuple` of `Symbol`s. When deserializing, if `field1` is encountered as an input key, it's value will be read, but the field will not be set in `T`. When serializing, `field1` will be skipped when serializing out `T` fields as key-value pairs.
 * `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
-* `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to the constructor method of the field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
+* `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to functions that set values for this field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
 """
 struct Mutable <: DataType end
 
@@ -220,6 +220,14 @@ An abstract type used in the API for "interface types" to map Julia types to a "
   * StructTypes.NullType
 """
 abstract type InterfaceType end
+
+"""
+    StructTypes.construct(T, args...; kw...)
+
+Function that custom types can overload for their `T` to construct an instance, given `args...` and `kw...`.
+The default definition is `StructTypes.construct(T, args...; kw...) = T(args...; kw...)`.
+"""
+function construct end
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.DictType()
@@ -530,8 +538,9 @@ end
 """
     StructTypes.foreachfield(f, x::T) => Nothing
 
-Apply function `f(i, name, FT, v)` over each field index `i`, field name `name`, field type `FT`,
-and field value `v` in `x`. Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` over collections.
+Apply function `f(i, name, FT, v; kw...)` over each field index `i`, field name `name`, field type `FT`,
+field value `v`, and any `kw` keyword arguments defined in `StructTypes.keywordargs` for `name` in `x`.
+Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` over collections.
 
 Various "configurations" are respected when applying `f` to each field:
   * If keyword arguments have been defined for a field via `StructTypes.keywordargs`, they will be passed like `f(i, name, FT, v; kw...)`
@@ -582,8 +591,9 @@ end
 """
     StructTypes.mapfields!(f, x::T)
 
-Applys the function `f(i, name, FT)` to each field index `i`, field name `name`, and field type `FT`
-of `x`, and calls `setfield!(x, name, y)` where `y` is returned from `f`.
+Applys the function `f(i, name, FT; kw...)` to each field index `i`, field name `name`, field type `FT`,
+and any `kw` defined in `StructTypes.keywordargs` for `name` of `x`, and calls `setfield!(x, name, y)`
+where `y` is returned from `f`.
 
 This is a convenience function for working with `StructTypes.Mutable`, where a function can be
 applied over the fields of the mutable struct to set each field value. It respects the various
@@ -626,11 +636,11 @@ end
     StructTypes.applyfield!(f, x::T, nm::Symbol) => Bool
 
 Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
-apply the function `f(i, name, FT)` to the field index `i`, field name `name`, and field type `FT`,
-setting the field value to the return value of `f`. Various StructType configurations are respected
-like keyword arguments, names, and exclusions. `applyfield!` returns whether `f` was executed
-or not; if `nm` isn't a valid field name on `x`, `false` will be returned (important for
-applications where the input still needs to consume the field, like json parsing).
+apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
+any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions. 
+`applyfield!` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
+will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
 mappings will be applied, and the function will be passed the Julia field name.
 """
