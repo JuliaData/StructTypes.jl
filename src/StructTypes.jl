@@ -158,12 +158,13 @@ idproperty(x::T) where {T} = idproperty(T)
 idproperty(::Type{T}) where {T} = :_
 
 """
-    StructTypes.fieldprefix(::Type{MyType}) = :mytype_
+    StructTypes.fieldprefix(::Type{MyType}, field::Symbol) = :field_
 
 When interacting with database tables and other strictly 2D data formats, objects with aggregate fields
 must be flattened into a single set of column names. When deserializing a set of columns into an
 object with aggregate fields, a field type's `fieldprefix` signals that column names beginning with, in
-the example above, `:mytype_`, should be collected together when constructing `MyType`.
+the example above, `:field_`, should be collected together when constructing the `field` field of `MyType`.
+Note the default definition is `StructTypes.fieldprefix(T, nm) = Symbol(nm, :_)`.
 
 Here's a more concrete, albeit contrived, example:
 ```julia
@@ -173,7 +174,6 @@ struct Spouse
 end
 
 StructTypes.StructType(::Type{Spouse}) = StructTypes.Struct()
-StructTypes.fieldprefix(::Type{Spouse}) = :spouse_
 
 struct Person
     id::Int
@@ -182,6 +182,7 @@ struct Person
 end
 
 StructTypes.StructType(::Type{Person}) = StructTypes.Struct()
+StructTypes.fieldprefix(::Type{Person}, field::Symbol) = field == :spouse ? :spouse_ : :_
 ```
 Here we have two structs, `Spouse` and `Person`, and a `Person` has a `spouse::Spouse`.
 The database tables to represent these entities might look like:
@@ -193,19 +194,21 @@ If we want to leverage a package like Strapping.jl to automatically handle the o
 for us, we could write a get query like the following to ensure a full `Person` with field `spouse::Spouse`
 can be constructed:
 ```julia
-getPerson(id::Int) = Strapping.select(db,
+getPerson(id::Int) = Strapping.construct(Person, DBInterface.execute(db,
     \"\"\"
         SELECT person.id as id, person.name as name, spouse.id as spouse_id, spouse.name as spouse_name
         FROM person
         LEFT JOIN spouse ON person.spouse_id = spouse.id
         WHERE person.id = \$id
-    \"\"\", Person)
+    \"\"\"))
 ```
 This works because the column names in the resultset of this query are "id, name, spouse_id, spouse_name";
-because we defined `StructTypes.fieldprefix(::Type{Spouse}) = :spouse_`, Strapping.jl knows that each
-column starting with "spouse_" should be used in constructing `Spouse` instead of `Person`.
+because we defined `StructTypes.fieldprefix` for `Person`, Strapping.jl knows that each
+column starting with "spouse_" should be used in constructing the `Spouse` field of `Person`.
 """
 function fieldprefix end
+
+Base.@pure fieldprefix(::Type{T}, nm::Symbol) where {T} = Symbol(nm, :_)
 
 """
     StructTypes.InterfaceType
