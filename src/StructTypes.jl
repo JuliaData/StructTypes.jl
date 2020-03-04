@@ -387,7 +387,11 @@ struct NumberType <: InterfaceType end
 StructType(::Type{<:Unsigned}) = NumberType()
 StructType(::Type{<:Signed}) = NumberType()
 StructType(::Type{<:AbstractFloat}) = NumberType()
+StructType(::Type{<:Threads.Atomic}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
+numbertype(::Type{Threads.Atomic{T}}) where {T} = T
+# 🏴‍☠️
+(::Type{T})(x::Threads.Atomic{T}) where {T <: Threads.AtomicTypes} = T(x[])
 numbertype(x) = Float64
 construct(T, x::Real; kw...) = T(x)
 
@@ -409,6 +413,7 @@ The interface to satisfy for serializing is:
 struct BoolType <: InterfaceType end
 
 StructType(::Type{Bool}) = BoolType()
+StructType(::Type{Threads.Atomic{Bool}}) = BoolType()
 construct(T, bool::Bool; kw...) = T(bool)
 
 """
