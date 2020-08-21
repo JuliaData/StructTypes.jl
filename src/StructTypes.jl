@@ -95,6 +95,8 @@ end
 
 Base.@pure julianame(names::Tuple{}, serializationname::Int) = serializationname
 
+Base.@pure julianame(name::Tuple{Symbol, Symbol}, serializationname::Symbol) = julianame(tuple(name), serializationname)
+
 Base.@pure function serializationname(names::Tuple{Vararg{Tuple{Symbol, Symbol}}}, julianame::Symbol)
     for nm in names
         nm[1] === julianame && return nm[2]
