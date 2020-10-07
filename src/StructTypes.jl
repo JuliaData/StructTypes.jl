@@ -35,9 +35,14 @@ end
 StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 
 # JSON3 package as example
-@assert JSON3.read("{\"val1\": 1, \"val2\": 2, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
+@assert JSON3.read("""
+{"val1":1,"val2":2,"val3":"3"}
+""", CoolType) == CoolType(1, 2, "3")
+
 # note how `val2` field is first, then `val1`, but fields are passed *in-order* to `CoolType` constructor; BE CAREFUL!
-@assert JSON3.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(2, 1, "3")
+@assert JSON3.read("""
+{"val2":4,"val1":5,"val3":"6"}
+""", CoolType) == CoolType(4, 5, "6")
 ```
 """
 struct Struct <: DataType end
