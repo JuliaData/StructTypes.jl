@@ -641,7 +641,7 @@ end
 Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
 apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
 any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
-value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions. 
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions.
 `applyfield!` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
 will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
@@ -685,5 +685,7 @@ mappings will be applied, and the function will be passed the Julia field name.
     )
     return f_applied
 end
+
+include("makeobj.jl")
 
 end # module

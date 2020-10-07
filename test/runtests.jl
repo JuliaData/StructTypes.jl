@@ -246,14 +246,14 @@ f(i, nm, T; dateformat=Dates.ISODateFormat) = nm == :date ? Date("11/23/1961", d
 
 StructTypes.names(::Type{LotsOfFields}) = ((:x35, :y35),)
 StructTypes.keywordargs(::Type{LotsOfFields}) = (x35=(hey=:ho,),)
-function f(i, nm, T; hey=:hey)
+function f1(i, nm, T; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     return vals[i]
 end
-@test StructTypes.construct(f, LotsOfFields) == LotsOfFields(vals...)
+@test StructTypes.construct(f1, LotsOfFields) == LotsOfFields(vals...)
 
 ## StructTypes.foreachfield
 StructTypes.foreachfield(A(1)) do i, nm, T, v
@@ -261,14 +261,14 @@ StructTypes.foreachfield(A(1)) do i, nm, T, v
     @test nm == :y
 end
 StructTypes.foreachfield((i, nm, T, v) -> @test((1, 3.14, "hey")[i] == v), B(1, 3.14, "hey"))
-function f(i, nm, T, v; hey=:hey)
+function f2(i, nm, T, v; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     @test vals[i] == v
 end
-StructTypes.foreachfield(f, LotsOfFields(vals...))
+StructTypes.foreachfield(f2, LotsOfFields(vals...))
 
 x = C()
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x)
@@ -305,3 +305,5 @@ StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 @test x2.a == 10 && x2.b == 3.14 && x2.c == "hey"
 
 end
+
+include("makeobj.jl")

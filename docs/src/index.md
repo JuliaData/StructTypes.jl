@@ -139,4 +139,6 @@ StructTypes.construct
 StructTypes.foreachfield
 StructTypes.mapfields!
 StructTypes.applyfield!
+StructTypes.makeobj
+StructTypes.makeobj!
 ```
