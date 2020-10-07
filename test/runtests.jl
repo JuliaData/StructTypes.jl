@@ -126,6 +126,23 @@ mutable struct C
     C(a::Int, b::Float64, c::String) = new(a, b, c)
 end
 
+mutable struct D
+    a::Union{Int, Nothing}
+    b::Union{Float64, Nothing}
+    c::Union{String, Nothing}
+    D() = new(nothing, nothing, nothing)
+    D(a::Union{Int, Nothing}, b::Union{Float64, Nothing}, c::Union{String, Nothing}) = new(a, b, c)
+end
+
+mutable struct E
+    a::Union{Int, Missing}
+    b::Union{Float64, Missing}
+    c::Union{String, Missing}
+    E() = new(missing, missing, missing)
+    E(a::Union{Int, Missing}, b::Union{Float64, Missing}, c::Union{String, Missing}) = new(a, b, c)
+
+end
+
 struct LotsOfFields
     x1::String
     x2::String
@@ -241,19 +258,19 @@ StructTypes.construct(A) do i, nm, T
 end
 
 StructTypes.keywordargs(::Type{DateStruct}) = (date=(dateformat=dateformat"mm/dd/yyyy",),)
-f(i, nm, T; dateformat=Dates.ISODateFormat) = nm == :date ? Date("11/23/1961", dateformat) : nm == :datetime ? DateTime(0) : Time(0)
-@test StructTypes.construct(f, DateStruct) == DateStruct(Date(1961, 11, 23), DateTime(0), Time(0))
+f1(i, nm, T; dateformat=Dates.ISODateFormat) = nm == :date ? Date("11/23/1961", dateformat) : nm == :datetime ? DateTime(0) : Time(0)
+@test StructTypes.construct(f1, DateStruct) == DateStruct(Date(1961, 11, 23), DateTime(0), Time(0))
 
 StructTypes.names(::Type{LotsOfFields}) = ((:x35, :y35),)
 StructTypes.keywordargs(::Type{LotsOfFields}) = (x35=(hey=:ho,),)
-function f(i, nm, T; hey=:hey)
+function f2(i, nm, T; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     return vals[i]
 end
-@test StructTypes.construct(f, LotsOfFields) == LotsOfFields(vals...)
+@test StructTypes.construct(f2, LotsOfFields) == LotsOfFields(vals...)
 
 ## StructTypes.foreachfield
 StructTypes.foreachfield(A(1)) do i, nm, T, v
@@ -261,14 +278,14 @@ StructTypes.foreachfield(A(1)) do i, nm, T, v
     @test nm == :y
 end
 StructTypes.foreachfield((i, nm, T, v) -> @test((1, 3.14, "hey")[i] == v), B(1, 3.14, "hey"))
-function f(i, nm, T, v; hey=:hey)
+function f3(i, nm, T, v; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     @test vals[i] == v
 end
-StructTypes.foreachfield(f, LotsOfFields(vals...))
+StructTypes.foreachfield(f3, LotsOfFields(vals...))
 
 x = C()
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x)
@@ -287,15 +304,23 @@ StructTypes.foreachfield((i, nm, T, v) -> @test(getfield(x, i) == getfield(x2, i
 
 x2 = C(1, 3.14, "")
 StructTypes.omitempties(::Type{C}) = (:c,)
+all_i = Int[]
+all_nm = Symbol[]
 StructTypes.foreachfield(x2) do i, nm, T, v
-    @test i != 3
-    @test nm != :c
+    push!(all_i, i)
+    push!(all_nm, nm)
 end
+@test sort(all_i) == [1, 2]
+@test sort(all_nm) == [:a, :b]
 StructTypes.excludes(::Type{C}) = (:a,)
+all_i = Int[]
+all_nm = Symbol[]
 StructTypes.foreachfield(x2) do i, nm, T, v
-    @test i != 1
-    @test nm != :a
+    push!(all_i, i)
+    push!(all_nm, nm)
 end
+@test sort(all_i) == [2]
+@test sort(all_nm) == [:b]
 # field isn't applied if excluded
 @test !StructTypes.applyfield!((i, nm, T) -> "ho", x2, :a)
 
@@ -304,4 +329,144 @@ x2.a = 10
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 @test x2.a == 10 && x2.b == 3.14 && x2.c == "hey"
 
+x3 = D(nothing, 3.14, "")
+@inline StructTypes.omitempties(::Type{D}) = true
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x3) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [2]
+@test sort(all_nm) == [:b]
+
+x4 = D(nothing, 3.14, "")
+@inline StructTypes.omitempties(::Type{D}) = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x3) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+x5 = C(1, 3.14, "helloworld")
+@inline StructTypes.omitempties(::Type{C}) = (:b,)
+@inline StructTypes.excludes(::Type{C}) = ()
+@inline StructTypes.isempty(::Type{T}, ::Number) where {T <: C} = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x5) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 2, 3]
+@test sort(all_nm) == [:a, :b, :c]
+@inline StructTypes.isempty(::Type{T}, x::Number) where {T <: C} = x > 0
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x5) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 3]
+@test sort(all_nm) == [:a, :c]
+
+x6 = E(1, missing, "")
+@inline StructTypes.omitempties(::Type{E}) = (:b,)
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: E} = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x6) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 2, 3]
+@test sort(all_nm) == [:a, :b, :c]
+
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: E} = true
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x6) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 3]
+@test sort(all_nm) == [:a, :c]
+
+@testset "issue 22 (`applyfield!` skips the 32nd field)" begin
+    function f4(i::Integer, name::Symbol, ::Type{FT}) where FT
+        return "$(i)"
+    end
+    x7 = LotsOfFields2()
+    for name in fieldnames(typeof(x7))
+        @test !isdefined(x7, name)
+    end
+    StructTypes.mapfields!(f4, x7)
+    for name in fieldnames(typeof(x7))
+        @test isdefined(x7, name)
+    end
+    for name in fieldnames(typeof(x7))
+        @test StructTypes.applyfield!(f4, x7, name)
+    end
+    x8 = LotsOfFields2()
+    for name in fieldnames(typeof(x8))
+        @test StructTypes.applyfield!(f4, x8, name)
+    end
+end
+
+end
+
+@testset "makeobj" begin
+    @testset "makeobj" begin
+        cases = [
+            (Any,               String,            "foo"),
+            (AbstractString,    String,            "foo"),
+            (String,            String,            "foo"),
+            (SubString,         SubString{String}, "foo"),
+            (SubString{String}, SubString{String}, "foo"),
+            (Any,               Int,               1),
+            (Real,              Int,               1),
+            (Integer,           Int,               1),
+            (Int,               Int,               1),
+            (Any,               Vector{Int},       [1, 2, 3]),
+            (Vector,            Vector{Int},       [1, 2, 3]),
+            (Vector{Any},       Vector{Any},       [1, 2, 3]),
+            (Vector{Real},      Vector{Real},      [1, 2, 3]),
+            (Vector{Integer},   Vector{Integer},   [1, 2, 3]),
+            (Vector{Int},       Vector{Int},       [1, 2, 3]),
+            (Any,               Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
+            (AbstractDict,      Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
+            (Dict,              Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
+            (Dict{Any, Any},    Dict{Any, Any},    Dict(:a => 1, :b => 2)),
+            (Dict{Symbol, Any}, Dict{Symbol, Any}, Dict(:a => 1, :b => 2)),
+            (Dict{Any, Int},    Dict{Any, Int},    Dict(:a => 1, :b => 2)),
+            (Dict{Symbol, Int}, Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
+        ]
+        for case in cases
+            a = case[1]
+            b = case[2]
+            c = case[3]
+            @test typeof(StructTypes.makeobj(a, c)) === b
+            @test StructTypes.makeobj(a, c) == c
+        end
+    end
+    @testset "mutable structs" begin
+        @testset "makeobj" begin
+            input = Dict(:a => 1, :b => 2.0, :c => "three")
+            output = StructTypes.makeobj(C, input)
+            @test typeof(output) === C
+            @test output.a == 1
+            @test output.b == 2.0
+            @test output.c == "three"
+        end
+        @testset "makeobj!" begin
+            input = Dict(:a => 1, :b => 2.0, :c => "three")
+            x = C()
+            output = StructTypes.makeobj!(x, input)
+            @test x === output
+            @test typeof(x) === C
+            @test x.a == 1
+            @test x.b == 2.0
+            @test x.c == "three"
+        end
+    end
 end
