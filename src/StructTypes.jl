@@ -63,7 +63,7 @@ There are a few additional helper methods that can be utilized by `StructTypes.M
 
 * `StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))`: provides a mapping of Julia field name to expected serialized object key name. This affects both serializing and deserializing. When deserializing the `serializedfield1` key, the `juliafield1` field of `T` will be set. When serializing the `juliafield2` field of `T`, the output key will be `serializedfield2`. Field name mappings are provided as a `Tuple` of `Tuple{Symbol, Symbol}`s, i.e. each field mapping is a Julia field name `Symbol` (first) and serialized field name `Symbol` (second).
 * `StructTypes.excludes(::Type{T}) = (:field1, :field2)`: specify fields of `T` to ignore when serializing and deserializing, provided as a `Tuple` of `Symbol`s. When deserializing, if `field1` is encountered as an input key, it's value will be read, but the field will not be set in `T`. When serializing, `field1` will be skipped when serializing out `T` fields as key-value pairs.
-* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized. To apply this to all fields of `T`, set `StructTypes.omitempties(::Type{T}) = true`.
 * `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to functions that set values for this field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
 """
 struct Mutable <: DataType end
@@ -116,9 +116,10 @@ excludes(::Type{T}) where {T} = ()
 
 """
     StructTypes.omitempties(::Type{T}) = (:field1, :field2)
+    StructTypes.omitempties(::Type{T}) = true
 
 Specify for a `StructTypes.Mutable` `StructType` the fields, given as a `Tuple` of `Symbol`s, that should not be serialized if they're considered "empty".
-If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized. To apply this to all fields of `T`, set `StructTypes.omitempties(::Type{T}) = true`.
 """
 function omitempties end
 
@@ -531,7 +532,12 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
              x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
 end
 
-Base.@pure function symbolin(names::Tuple{Vararg{Symbol}}, name::Symbol)
+Base.@pure function symbolin(names::Union{Tuple{Vararg{Symbol}}, Bool}, name::Symbol)
+    if names === true
+        return true
+    elseif names === false
+        return false
+    end
     for nm in names
         nm === name && return true
     end
@@ -641,7 +647,7 @@ end
 Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
 apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
 any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
-value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions. 
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions.
 `applyfield!` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
 will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`

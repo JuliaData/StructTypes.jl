@@ -126,6 +126,14 @@ mutable struct C
     C(a::Int, b::Float64, c::String) = new(a, b, c)
 end
 
+mutable struct D
+    a::Union{Int, Nothing}
+    b::Union{Float64, Nothing}
+    c::Union{String, Nothing}
+    D() = new(nothing, nothing, nothing)
+    D(a::Union{Int, Nothing}, b::Union{Float64, Nothing}, c::Union{String, Nothing}) = new(a, b, c)
+end
+
 struct LotsOfFields
     x1::String
     x2::String
@@ -303,5 +311,27 @@ end
 x2.a = 10
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 @test x2.a == 10 && x2.b == 3.14 && x2.c == "hey"
+
+x3 = D(nothing, 3.14, "")
+@inline StructTypes.omitempties(::Type{D}) = true
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x3) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [2]
+@test sort(all_nm) == [:b]
+
+x4 = D(nothing, 3.14, "")
+@inline StructTypes.omitempties(::Type{D}) = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x3) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 2, 3]
+@test sort(all_nm) == [:a, :b, :c]
 
 end
