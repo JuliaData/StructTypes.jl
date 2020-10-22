@@ -63,7 +63,7 @@ There are a few additional helper methods that can be utilized by `StructTypes.M
 
 * `StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))`: provides a mapping of Julia field name to expected serialized object key name. This affects both serializing and deserializing. When deserializing the `serializedfield1` key, the `juliafield1` field of `T` will be set. When serializing the `juliafield2` field of `T`, the output key will be `serializedfield2`. Field name mappings are provided as a `Tuple` of `Tuple{Symbol, Symbol}`s, i.e. each field mapping is a Julia field name `Symbol` (first) and serialized field name `Symbol` (second).
 * `StructTypes.excludes(::Type{T}) = (:field1, :field2)`: specify fields of `T` to ignore when serializing and deserializing, provided as a `Tuple` of `Symbol`s. When deserializing, if `field1` is encountered as an input key, it's value will be read, but the field will not be set in `T`. When serializing, `field1` will be skipped when serializing out `T` fields as key-value pairs.
-* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing` or `missing`, it will not be serialized.
 * `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to functions that set values for this field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
 """
 struct Mutable <: DataType end
@@ -118,7 +118,7 @@ excludes(::Type{T}) where {T} = ()
     StructTypes.omitempties(::Type{T}) = (:field1, :field2)
 
 Specify for a `StructTypes.Mutable` `StructType` the fields, given as a `Tuple` of `Symbol`s, that should not be serialized if they're considered "empty".
-If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing` or `missing`, it will not be serialized.
 """
 function omitempties end
 
@@ -130,6 +130,7 @@ function isempty end
 isempty(x::Union{AbstractDict, AbstractArray, AbstractString, Tuple, NamedTuple}) = Base.isempty(x)
 isempty(::Number) = false
 isempty(::Nothing) = true
+isempty(::Missing) = true
 isempty(x) = false
 isempty(x, i) = isempty(Core.getfield(x, i))
 

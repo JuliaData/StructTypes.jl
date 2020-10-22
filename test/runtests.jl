@@ -36,6 +36,7 @@ end
 @test StructTypes.isempty(NamedTuple())
 @test !StructTypes.isempty(1)
 @test StructTypes.isempty(nothing)
+@test StructTypes.isempty(missing)
 @test !StructTypes.isempty(A(1))
 @test !StructTypes.isempty(A(1), 1)
 
