@@ -241,19 +241,19 @@ StructTypes.construct(A) do i, nm, T
 end
 
 StructTypes.keywordargs(::Type{DateStruct}) = (date=(dateformat=dateformat"mm/dd/yyyy",),)
-f(i, nm, T; dateformat=Dates.ISODateFormat) = nm == :date ? Date("11/23/1961", dateformat) : nm == :datetime ? DateTime(0) : Time(0)
-@test StructTypes.construct(f, DateStruct) == DateStruct(Date(1961, 11, 23), DateTime(0), Time(0))
+f1(i, nm, T; dateformat=Dates.ISODateFormat) = nm == :date ? Date("11/23/1961", dateformat) : nm == :datetime ? DateTime(0) : Time(0)
+@test StructTypes.construct(f1, DateStruct) == DateStruct(Date(1961, 11, 23), DateTime(0), Time(0))
 
 StructTypes.names(::Type{LotsOfFields}) = ((:x35, :y35),)
 StructTypes.keywordargs(::Type{LotsOfFields}) = (x35=(hey=:ho,),)
-function f(i, nm, T; hey=:hey)
+function f2(i, nm, T; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     return vals[i]
 end
-@test StructTypes.construct(f, LotsOfFields) == LotsOfFields(vals...)
+@test StructTypes.construct(f2, LotsOfFields) == LotsOfFields(vals...)
 
 ## StructTypes.foreachfield
 StructTypes.foreachfield(A(1)) do i, nm, T, v
@@ -261,14 +261,14 @@ StructTypes.foreachfield(A(1)) do i, nm, T, v
     @test nm == :y
 end
 StructTypes.foreachfield((i, nm, T, v) -> @test((1, 3.14, "hey")[i] == v), B(1, 3.14, "hey"))
-function f(i, nm, T, v; hey=:hey)
+function f3(i, nm, T, v; hey=:hey)
     if i == 35
         @test nm == :y35
         @test hey == :ho
     end
     @test vals[i] == v
 end
-StructTypes.foreachfield(f, LotsOfFields(vals...))
+StructTypes.foreachfield(f3, LotsOfFields(vals...))
 
 x = C()
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x)
@@ -287,15 +287,23 @@ StructTypes.foreachfield((i, nm, T, v) -> @test(getfield(x, i) == getfield(x2, i
 
 x2 = C(1, 3.14, "")
 StructTypes.omitempties(::Type{C}) = (:c,)
+all_i = Int[]
+all_nm = Symbol[]
 StructTypes.foreachfield(x2) do i, nm, T, v
-    @test i != 3
-    @test nm != :c
+    push!(all_i, i)
+    push!(all_nm, nm)
 end
+@test sort(all_i) == [1, 2]
+@test sort(all_nm) == [:a, :b]
 StructTypes.excludes(::Type{C}) = (:a,)
+all_i = Int[]
+all_nm = Symbol[]
 StructTypes.foreachfield(x2) do i, nm, T, v
-    @test i != 1
-    @test nm != :a
+    push!(all_i, i)
+    push!(all_nm, nm)
 end
+@test sort(all_i) == [2]
+@test sort(all_nm) == [:b]
 # field isn't applied if excluded
 @test !StructTypes.applyfield!((i, nm, T) -> "ho", x2, :a)
 
