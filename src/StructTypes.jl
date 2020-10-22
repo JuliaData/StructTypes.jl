@@ -63,7 +63,11 @@ There are a few additional helper methods that can be utilized by `StructTypes.M
 
 * `StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))`: provides a mapping of Julia field name to expected serialized object key name. This affects both serializing and deserializing. When deserializing the `serializedfield1` key, the `juliafield1` field of `T` will be set. When serializing the `juliafield2` field of `T`, the output key will be `serializedfield2`. Field name mappings are provided as a `Tuple` of `Tuple{Symbol, Symbol}`s, i.e. each field mapping is a Julia field name `Symbol` (first) and serialized field name `Symbol` (second).
 * `StructTypes.excludes(::Type{T}) = (:field1, :field2)`: specify fields of `T` to ignore when serializing and deserializing, provided as a `Tuple` of `Symbol`s. When deserializing, if `field1` is encountered as an input key, it's value will be read, but the field will not be set in `T`. When serializing, `field1` will be skipped when serializing out `T` fields as key-value pairs.
-* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+* `StructTypes.omitempties(::Type{T}) = (:field1, :field2)`: specify fields of `T` that shouldn't be serialized if they are "empty", provided as a `Tuple` of `Symbol`s. This only affects serializing. If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized. You can customize this behavior. For example, by default, `missing` is not considered to be "empty". If you want `missing` to be considered "empty" when serializing your type `MyType`, simply define:
+```julia
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: MyType} = true
+```
+
 * `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to functions that set values for this field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
 """
 struct Mutable <: DataType end
@@ -119,6 +123,11 @@ excludes(::Type{T}) where {T} = ()
 
 Specify for a `StructTypes.Mutable` `StructType` the fields, given as a `Tuple` of `Symbol`s, that should not be serialized if they're considered "empty".
 If a field is a collection (AbstractDict, AbstractArray, etc.) and `isempty(x) === true`, then it will not be serialized. If a field is `#undef`, it will not be serialized. If a field is `nothing`, it will not be serialized.
+
+You can customize this behavior. For example, by default, `missing` is not considered to be "empty". If you want `missing` to be considered "empty" when serializing your type `MyType`, simply define:
+```julia
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: MyType} = true
+```
 """
 function omitempties end
 
@@ -132,6 +141,8 @@ isempty(::Number) = false
 isempty(::Nothing) = true
 isempty(x) = false
 isempty(x, i) = isempty(Core.getfield(x, i))
+isempty(::Type{T}, x) where {T} = isempty(x) # generic fallback
+isempty(::Type{T}, x, i) where {T} = isempty(T, Core.getfield(x, i)) # generic fallback
 
 """
     StructTypes.keywordargs(::Type{MyType}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))
@@ -561,7 +572,7 @@ Various "configurations" are respected when applying `f` to each field:
         k_i = fieldname(T, i)
         if !symbolin(excl, k_i) && isdefined(x, i)
             v_i = Core.getfield(x, i)
-            if !symbolin(emp, k_i) || !isempty(x, i)
+            if !symbolin(emp, k_i) || !isempty(T, x, i)
                 if haskey(kwargs, k_i)
                     f(i, serializationname(nms, k_i), fieldtype(T, i), v_i; kwargs[k_i]...)
                 else
@@ -576,7 +587,7 @@ Various "configurations" are respected when applying `f` to each field:
             k_i = fieldname(T, i)
             if !symbolin(excl, k_i) && isdefined(x, i)
                 v_i = Core.getfield(x, i)
-                if !symbolin(emp, k_i) || !isempty(x, i)
+                if !symbolin(emp, k_i) || !isempty(T, x, i)
                     if haskey(kwargs, k_i)
                         f(i, serializationname(nms, k_i), fieldtype(T, i), v_i; kwargs[k_i]...)
                     else
@@ -641,7 +652,7 @@ end
 Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
 apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
 any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
-value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions. 
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions.
 `applyfield!` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
 will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`

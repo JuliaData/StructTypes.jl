@@ -126,6 +126,14 @@ mutable struct C
     C(a::Int, b::Float64, c::String) = new(a, b, c)
 end
 
+mutable struct E
+    a::Union{Int, Missing}
+    b::Union{Float64, Missing}
+    c::Union{String, Missing}
+    E() = new(missing, missing, missing)
+    E(a::Union{Int, Missing}, b::Union{Float64, Missing}, c::Union{String, Missing}) = new(a, b, c)
+end
+
 struct LotsOfFields
     x1::String
     x2::String
@@ -303,5 +311,48 @@ end
 x2.a = 10
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 @test x2.a == 10 && x2.b == 3.14 && x2.c == "hey"
+
+x5 = C(1, 3.14, "helloworld")
+@inline StructTypes.omitempties(::Type{C}) = (:b,)
+@inline StructTypes.excludes(::Type{C}) = ()
+@inline StructTypes.isempty(::Type{T}, ::Number) where {T <: C} = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x5) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 2, 3]
+@test sort(all_nm) == [:a, :b, :c]
+@inline StructTypes.isempty(::Type{T}, x::Number) where {T <: C} = x > 0
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x5) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 3]
+@test sort(all_nm) == [:a, :c]
+
+x6 = E(1, missing, "")
+@inline StructTypes.omitempties(::Type{E}) = (:b,)
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: E} = false
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x6) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 2, 3]
+@test sort(all_nm) == [:a, :b, :c]
+@inline StructTypes.isempty(::Type{T}, ::Missing) where {T <: E} = true
+all_i = Int[]
+all_nm = Symbol[]
+StructTypes.foreachfield(x6) do i, nm, T, v
+    push!(all_i, i)
+    push!(all_nm, nm)
+end
+@test sort(all_i) == [1, 3]
+@test sort(all_nm) == [:a, :c]
 
 end
