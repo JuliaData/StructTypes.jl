@@ -545,10 +545,6 @@ end
 
 Base.@pure function symbolin(names::Union{Tuple{Vararg{Symbol}}, Bool}, name::Symbol)
     names isa Bool && return names
-        return true
-    elseif names === false
-        return false
-    end
     for nm in names
         nm === name && return true
     end
