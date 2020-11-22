@@ -752,4 +752,10 @@ function makeobj!(x::T, obj::AbstractDict) where {T}
     return x
 end
 
+@static if Base.VERSION < v"1.2"
+    function hasfield(::Type{T}, name::Symbol) where T
+        return name in fieldnames(T)
+    end
+end
+
 end # module
