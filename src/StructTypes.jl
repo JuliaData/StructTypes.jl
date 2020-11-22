@@ -544,7 +544,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
 end
 
 Base.@pure function symbolin(names::Union{Tuple{Vararg{Symbol}}, Bool}, name::Symbol)
-    if names === true
+    names isa Bool && return names
         return true
     elseif names === false
         return false
