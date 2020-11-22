@@ -19,7 +19,7 @@ In particular, when deserializing, parsed input fields are passed directly, in i
 This means that any field names are ignored when deserializing; fields are directly passed to `T` in the order they're encountered.
 
 For example, for reading a `StructTypes.Struct()` from a JSON string input, each key-value pair is read in the order it is encountered in the JSON input, the keys are ignored, and the values are directly passed to the type at the end of the object parsing like `T(val1, val2, val3)`.
-Yes, the JSON specification says that Objects are specifically ***un-ordered*** collections of key-value pairs,
+Yes, the JSON specification says that Objects are specifically **un-ordered** collections of key-value pairs,
 but the truth is that many JSON libraries provide ways to maintain JSON Object key-value pair order when reading/writing.
 Because of the minimal processing done while parsing, and the "trusting" that the Julia type constructor will be able to handle fields being present, missing, or even extra fields that should be ignored,
 this is the fastest possible method for mapping a JSON input to a Julia structure.
@@ -46,7 +46,7 @@ struct Struct <: DataType end
     StructTypes.StructType(::Type{T}) = StructTypes.Mutable()
 
 Signal that `T` is a mutable struct with an empty constructor for serializing/deserializing.
-Though slightly less performant than `StructTypes.Struct`, `Mutable` is a much more robust method for mapping Julia struct fields for serialization. This technique requires your Julia type to be defined, ***at a minimum***, like:
+Though slightly less performant than `StructTypes.Struct`, `Mutable` is a much more robust method for mapping Julia struct fields for serialization. This technique requires your Julia type to be defined, **at a minimum**, like:
 ```julia
 mutable struct T
     field1
@@ -57,7 +57,7 @@ mutable struct T
     T() = new()
 end
 ```
-Note specifically that we're defining a `mutable struct` to allow field mutation, and providing a `T() = new()` inner constructor which constructs an "empty" `T` where `isbitstype` fields will be randomly initialized, and reference fields will be `#undef`. (Note that the inner constructor doesn't need to be ***exactly*** this, but at least needs to be callable like `T()`. If certain fields need to be intialized or zeroed out for security, then this should be accounted for in the inner constructor). For these mutable types, the type will first be initizlied like `T()`, then serialization will take each key-value input pair, setting the field as the key is encountered, and converting the value to the appropriate field value. This flow has the nice properties of: allowing object construction success even if fields are missing in the input, and if "extra" fields exist in the input that aren't apart of the Julia struct's fields, they will automatically be ignored. This allows for maximum robustness when mapping Julia types to arbitrary data foramts that may be generated via web services, databases, other language libraries, etc.
+Note specifically that we're defining a `mutable struct` to allow field mutation, and providing a `T() = new()` inner constructor which constructs an "empty" `T` where `isbitstype` fields will be randomly initialized, and reference fields will be `#undef`. (Note that the inner constructor doesn't need to be **exactly** this, but at least needs to be callable like `T()`. If certain fields need to be intialized or zeroed out for security, then this should be accounted for in the inner constructor). For these mutable types, the type will first be initizlied like `T()`, then serialization will take each key-value input pair, setting the field as the key is encountered, and converting the value to the appropriate field value. This flow has the nice properties of: allowing object construction success even if fields are missing in the input, and if "extra" fields exist in the input that aren't apart of the Julia struct's fields, they will automatically be ignored. This allows for maximum robustness when mapping Julia types to arbitrary data foramts that may be generated via web services, databases, other language libraries, etc.
 
 There are a few additional helper methods that can be utilized by `StructTypes.Mutable()` types to hand-tune field reading/writing behavior:
 
@@ -373,7 +373,7 @@ Types already declared as `StructTypes.NumberType()` include:
   * Any subtype of `Unsigned`
   * Any subtype of `AbstractFloat`
 
-In addition to declaring `StructTypes.NumberType()`, custom types can also specify a specific, ***existing*** number type it should map to. It does this like:
+In addition to declaring `StructTypes.NumberType()`, custom types can also specify a specific, **existing** number type it should map to. It does this like:
 ```julia
 StructTypes.numbertype(::Type{T}) = Float64
 ```
@@ -476,7 +476,7 @@ car = StructTypes.read(\"\"\"
 Here we have a `Vehicle` type that is defined as a `StructTypes.AbstractType()`.
 We also have two concrete subtypes, `Car` and `Truck`. In addition to the `StructType` definition,
 we also define `StructTypes.subtypekey(::Type{Vehicle}) = :type`, which signals that when deserializing,
-when it encounters the `type` key, it should use the ***value***, in the above example: `car`,
+when it encounters the `type` key, it should use the **value**, in the above example: `car`,
 to discover the appropriate concrete subtype to parse the structure as, in this case `Car`.
 The mapping of subtype key value to concrete Julia subtype is defined in our example via
 `StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)`.
@@ -641,7 +641,7 @@ end
 Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
 apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
 any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
-value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions. 
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions.
 `applyfield!` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
 will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
