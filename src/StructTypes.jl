@@ -730,7 +730,8 @@ makeobj(::Type{T}, obj::AbstractDict) where {T <: AbstractDict} = convert(T, obj
 """
     makeobj(::Type{T}, obj::AbstractDict) where {T}
 
-Convert `obj` to an object of `T`. `T` must be a mutable struct.
+Convert `obj` to an object of `T`. `T` must be a `StructTypes.Mutable()`.
+
 """
 function makeobj(::Type{T}, obj::AbstractDict) where {T}
     x = T()
