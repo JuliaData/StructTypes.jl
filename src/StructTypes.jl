@@ -516,7 +516,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
     N = fieldcount(T)
     nms = names(T)
     kwargs = keywordargs(T)
-    constructor = T <: Tuple ? tuple : T
+    constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
     # unroll first 32 fields
     Base.@nexprs 32 i -> begin
         k_i = fieldname(T, i)
@@ -537,6 +537,27 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
         else
             x_i = f(i, serializationname(nms, k_i), fieldtype(T, i))
         end
+        push!(vals, x_i)
+    end
+    return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,
+             x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
+end
+
+@inline function construct(f, T::Type{NamedTuple{names, types}}) where {names, types}
+    N = length(names)
+    constructor = ((x...) -> T(tuple(x...)))
+    # unroll first 32 fields
+    Base.@nexprs 32 i -> begin
+        @inbounds k_i = names[i]
+        x_i = f(i, k_i, fieldtype(types, i))
+        if N == i
+            return Base.@ncall(i, constructor, x)
+        end
+    end
+    vals = []
+    for i = 33:N
+        @inbounds k_i = names[i]
+        x_i = f(i, k_i, fieldtype(types, i))
         push!(vals, x_i)
     end
     return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,

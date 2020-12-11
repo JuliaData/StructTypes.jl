@@ -329,6 +329,9 @@ x2.a = 10
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 @test x2.a == 10 && x2.b == 3.14 && x2.c == "hey"
 
+# NamedTuple
+@test StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}) == (a=1, b=3.14, c="hey")
+  
 x3 = D(nothing, 3.14, "")
 @inline StructTypes.omitempties(::Type{D}) = true
 all_i = Int[]
