@@ -311,6 +311,7 @@ StructType(::Type{<:AbstractSet}) = ArrayType()
 StructType(::Type{<:Tuple}) = ArrayType()
 
 construct(T, x::Vector{S}; kw...) where {S} = T(x)
+construct(::Type{Vector}, x::Vector; kw...) = x
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.StringType()
@@ -371,6 +372,8 @@ function construct(::Type{E}, sym::Symbol) where {E <: Enum}
 end
 
 construct(T, str::String; kw...) = T(str)
+construct(T, sym::Symbol; kw...) = T(sym)
+construct(::Type{T}, str::String; kw...) where {T <: AbstractString} = convert(T, str)
 construct(T, ptr::Ptr{UInt8}, len::Int; kw...) = construct(T, unsafe_string(ptr, len); kw...)
 construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
 construct(::Type{T}, str::String; dateformat::Dates.DateFormat=Dates.default_format(T), kw...) where {T <: Dates.TimeType} = T(str, dateformat)
@@ -396,9 +399,7 @@ Similarly for serializing, `Float64(x::T)` will first be called before serializi
 """
 struct NumberType <: InterfaceType end
 
-StructType(::Type{<:Unsigned}) = NumberType()
-StructType(::Type{<:Signed}) = NumberType()
-StructType(::Type{<:AbstractFloat}) = NumberType()
+StructType(::Type{<:Real}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
 construct(T, x::Real; kw...) = T(x)
@@ -748,22 +749,24 @@ constructfrom(::Union{StringType, BoolType, NullType}, ::Type{T}, obj) where {T}
 constructfrom(::NumberType, ::Type{T}, obj) where {T} =
     construct(T, numbertype(T)(obj))
 
-function constructfrom(::ArrayType, ::Type{T}, obj) where {T}
-    if Base.IteratorEltype(T) == Base.HasEltype()
-        eT = eltype(T)
-        if Base.haslength(obj)
-            x = Vector{eT}(undef, length(obj))
-            for (i, val) in enumerate(obj)
-                @inbounds x[i] = constructfrom(eT, val)
-            end
-        else
-            x = eT[]
-            for val in obj
-                push!(x, constructfrom(eT, val))
-            end
+constructfrom(::ArrayType, ::Type{T}, obj) where {T} =
+    constructfrom(ArrayType(), T, Base.IteratorEltype(T) == Base.HasEltype() ? eltype(T) : Any, obj)
+constructfrom(::ArrayType, ::Type{Vector}, obj) =
+    constructfrom(ArrayType(), Vector, Any, obj)
+# constructfrom(::ArrayType, ::Type{Tuple}, obj) =
+#     constructfrom(ArrayType(), T, Any, obj)
+
+function constructfrom(::ArrayType, ::Type{T}, ::Type{eT}, obj) where {T, eT}
+    if Base.haslength(obj)
+        x = Vector{eT}(undef, length(obj))
+        for (i, val) in enumerate(obj)
+            @inbounds x[i] = constructfrom(eT, val)
         end
     else
-        x = collect(obj)
+        x = eT[]
+        for val in obj
+            push!(x, constructfrom(eT, val))
+        end
     end
     return construct(T, x)
 end
@@ -773,6 +776,8 @@ constructfrom(::DictType, ::Type{T}, obj) where {T} =
 constructfrom(::DictType, ::Type{NamedTuple}, obj) =
     constructfrom(DictType(), NamedTuple, Symbol, Any, obj)
 constructfrom(::DictType, ::Type{Dict}, obj) =
+    constructfrom(DictType(), Dict, Any, Any, obj)
+constructfrom(::DictType, ::Type{AbstractDict}, obj) =
     constructfrom(DictType(), Dict, Any, Any, obj)
 constructfrom(::DictType, ::Type{T}, obj) where {T <: AbstractDict} =
     constructfrom(DictType(), T, keytype(T), valtype(T), obj)
