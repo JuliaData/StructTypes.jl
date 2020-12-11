@@ -418,6 +418,29 @@ end
 
 end
 
+abstract type Vehicle end
+
+struct Car <: Vehicle
+    type::String
+    make::String
+    model::String
+    seatingCapacity::Int
+    topSpeed::Float64
+end
+
+struct Truck <: Vehicle
+    type::String
+    make::String
+    model::String
+    payloadCapacity::Float64
+end
+
+StructTypes.StructType(::Type{Vehicle}) = StructTypes.AbstractType()
+StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
+
+StructTypes.StructType(::Type{Car}) = StructTypes.Struct()
+StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
+
 @testset "makeobj" begin
     @testset "makeobj" begin
         cases = [
@@ -461,6 +484,10 @@ end
             @test output.a == 1
             @test output.b == 2.0
             @test output.c == "three"
+            dict = Dict(:type => "car", :make => "Mercedes-Benz", :model => "S500", :seatingCapacity => 5, :topSpeed => 250.1)
+            car = StructTypes.constructfrom(Vehicle, dict)
+            @test typeof(car) == Car
+            @test car.make == "Mercedes-Benz"
         end
         @testset "constructfrom!" begin
             input = Dict(:a => 1, :b => 2.0, :c => "three")
@@ -471,6 +498,9 @@ end
             @test x.a == 1
             @test x.b == 2.0
             @test x.c == "three"
+            @test StructTypes.constructfrom(Tuple{Int64, Float64, String}, [1, 2.0, "three"]) == (1, 2.0, "three")
+            @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, input) == (a=1, b=2.0, c="three")
+            @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, x) == (a=1, b=2.0, c="three")
         end
     end
 end

@@ -727,6 +727,27 @@ end
     end
 end
 
+"""
+    StructTypes.constructfrom(T, obj)
+    StructTypes.constructfrom!(x::T, obj)
+
+Construct an object of type `T` (`StructTypes.construtfrom`) or populate an existing
+object of type `T` (`StructTypes.constructfrom!`) from another object `obj`. Utilizes
+and respects StructTypes.jl package properties, querying the `StructType` of `T`
+and respecting various serialization/deserialization names, keyword args, etc.
+
+Most typical use-case is construct a custom type `T` from an `obj::AbstractDict`, but
+`constructfrom` is fully generic, so the inverse is also supported (turning any custom
+struct into an `AbstractDict`). For example, an external service may be providing JSON
+data with an evolving schema; as opposed to trying a strict "typed parsing" like
+`JSON3.read(json, T)`, it may be preferrable to setup a local custom struct with just
+the desired properties and call `StructTypes.constructfrom(T, JSON3.read(json))`. This
+would first do a generic parse of the JSON data into a `JSON3.Object`, which is an
+`AbstractDict`, which is then used as a "property source" to populate the fields of
+our custom type `T`.
+"""
+function constructfrom end
+
 constructfrom(::Type{T}, obj) where {T} =
     constructfrom(StructType(T), T, obj)
 
@@ -753,8 +774,6 @@ constructfrom(::ArrayType, ::Type{T}, obj) where {T} =
     constructfrom(ArrayType(), T, Base.IteratorEltype(T) == Base.HasEltype() ? eltype(T) : Any, obj)
 constructfrom(::ArrayType, ::Type{Vector}, obj) =
     constructfrom(ArrayType(), Vector, Any, obj)
-# constructfrom(::ArrayType, ::Type{Tuple}, obj) =
-#     constructfrom(ArrayType(), T, Any, obj)
 
 function constructfrom(::ArrayType, ::Type{T}, ::Type{eT}, obj) where {T, eT}
     if Base.haslength(obj)
@@ -782,12 +801,30 @@ constructfrom(::DictType, ::Type{AbstractDict}, obj) =
 constructfrom(::DictType, ::Type{T}, obj) where {T <: AbstractDict} =
     constructfrom(DictType(), T, keytype(T), valtype(T), obj)
 
-function constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, obj) where {T, K, V}
+@inline constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, obj::S) where {T, K, V, S} =
+    constructfrom(DictType(), T, K, V, StructType(S), obj)
+
+function constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, ::DictType, obj) where {T, K, V}
     d = Dict{K, V}()
     for (k, v) in keyvaluepairs(obj)
         d[constructfrom(K, k)] = constructfrom(V, v)
     end
     return construct(T, d)
+end
+
+struct ToDictClosure{K, V}
+    x::Dict{K, V}
+end
+
+@inline function (f::ToDictClosure{K, V})(i, nm, ::Type{FT}, v::T; kw...) where {K, V, FT, T}
+    f.x[constructfrom(K, nm)] = constructfrom(V, v)
+    return
+end
+
+function constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, ::Union{Struct, Mutable}, obj) where {T, K, V}
+    d = Dict{K, V}()
+    foreachfield(ToDictClosure(d), obj)
+    return constructfrom(T, d)
 end
 
 constructfrom(::Mutable, ::Type{T}, obj) where {T} =
@@ -854,5 +891,25 @@ end
 
 constructfrom(::Struct, ::Type{T}, ::Union{Struct, Mutable}, obj) where {T} =
     construct(StructClosure(obj), T)
+
+struct TupleClosure{T}
+    obj::T
+end
+
+@inline (f::TupleClosure{T})(i, nm, ::Type{FT}) where {T, FT} =
+    constructfrom(FT, f.obj[i])
+
+constructfrom(::ArrayType, ::Type{T}, obj) where {T <: Tuple} =
+    construct(TupleClosure(obj), T)
+
+function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
+    types = subtypes(T)
+    if length(types) == 1
+        return constructfrom(types[1], obj)
+    end
+    skey = subtypekey(T)
+    TT = types[Symbol(StructType(S) == DictType() ? obj[skey] : getfield(obj, skey))]
+    return constructfrom(TT, obj)
+end
 
 end # module
