@@ -824,7 +824,7 @@ end
 function constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, ::Union{Struct, Mutable}, obj) where {T, K, V}
     d = Dict{K, V}()
     foreachfield(ToDictClosure(d), obj)
-    return constructfrom(T, d)
+    return construct(T, d)
 end
 
 constructfrom(::Mutable, ::Type{T}, obj) where {T} =

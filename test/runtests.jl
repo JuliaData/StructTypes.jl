@@ -441,6 +441,16 @@ StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
 StructTypes.StructType(::Type{Car}) = StructTypes.Struct()
 StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
 
+mutable struct C2
+    a::Int
+    b::Float64
+    c::String
+    C2() = new()
+    C2(a::Int, b::Float64, c::String) = new(a, b, c)
+end
+
+StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
+
 @testset "makeobj" begin
     @testset "makeobj" begin
         cases = [
@@ -477,10 +487,9 @@ StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
     end
     @testset "mutable structs" begin
         @testset "constructfrom" begin
-            StructTypes.StructType(::Type{C}) = StructTypes.Mutable()
             input = Dict(:a => 1, :b => 2.0, :c => "three")
-            output = StructTypes.constructfrom(C, input)
-            @test typeof(output) === C
+            output = StructTypes.constructfrom(C2, input)
+            @test typeof(output) === C2
             @test output.a == 1
             @test output.b == 2.0
             @test output.c == "three"
@@ -491,10 +500,10 @@ StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
         end
         @testset "constructfrom!" begin
             input = Dict(:a => 1, :b => 2.0, :c => "three")
-            x = C()
+            x = C2()
             output = StructTypes.constructfrom!(x, input)
             @test x === output
-            @test typeof(x) === C
+            @test typeof(x) === C2
             @test x.a == 1
             @test x.b == 2.0
             @test x.c == "three"
