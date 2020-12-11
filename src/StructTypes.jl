@@ -720,64 +720,134 @@ mappings will be applied, and the function will be passed the Julia field name.
     return f_applied
 end
 
-"""
-    makeobj(::Type{Any}, obj::Any)
-
-Return `obj`.
-"""
-makeobj(::Type{Any}, obj) = obj
-
-"""
-    makeobj(::Type{Any}, obj::AbstractDict)
-
-Return `obj`.
-"""
-makeobj(::Type{Any}, obj::AbstractDict) = obj
-
-"""
-    makeobj(::Type{T}, obj::Any)
-
-Convert `obj` to an object of `T`.
-"""
-makeobj(::Type{T}, obj) where {T <: Any} = convert(T, obj)::T
-
-"""
-    makeobj(::Type{T}, obj::AbstractDict) where {T <: AbstractDict}
-
-Convert `obj` to an object of `T`.
-"""
-makeobj(::Type{T}, obj::AbstractDict) where {T <: AbstractDict} = convert(T, obj)::T
-
-"""
-    makeobj(::Type{T}, obj::AbstractDict) where {T}
-
-Convert `obj` to an object of `T`. `T` must be a `StructTypes.Mutable()`.
-
-"""
-function makeobj(::Type{T}, obj::AbstractDict) where {T}
-    x = T()
-    makeobj!(x, obj)
-    return x
-end
-
-"""
-    makeobj!(x::T, obj::AbstractDict) where {T}
-
-Populate the fields of `x` with the values from `obj`. `T` must be a mutable struct.
-"""
-function makeobj!(x::T, obj::AbstractDict) where {T}
-    for (k, v) in obj
-        if hasfield(T, k)
-            setfield!(x, k, makeobj(fieldtype(T, k), v))
-        end
-    end
-    return x
-end
-
 @static if Base.VERSION < v"1.2"
     function hasfield(::Type{T}, name::Symbol) where T
         return name in fieldnames(T)
     end
 end
+
+constructfrom(::Type{T}, obj) where {T} =
+    constructfrom(StructType(T), T, obj)
+
+constructfrom!(x::T, obj) where {T} =
+    constructfrom!(StructType(T), x, obj)
+
+function constructfrom(::Struct, U::Union, obj)
+    try
+        return constructfrom(StructType(U.a), U.a, obj)
+    catch e
+        return constructfrom(StructType(U.b), U.b, obj)
+    end
+end
+
+constructfrom(::Struct, ::Type{Any}, obj) = obj
+
+constructfrom(::Union{StringType, BoolType, NullType}, ::Type{T}, obj) where {T} =
+    construct(T, obj)
+
+constructfrom(::NumberType, ::Type{T}, obj) where {T} =
+    construct(T, numbertype(T)(obj))
+
+function constructfrom(::ArrayType, ::Type{T}, obj) where {T}
+    if Base.IteratorEltype(T) == Base.HasEltype()
+        eT = eltype(T)
+        if Base.haslength(obj)
+            x = Vector{eT}(undef, length(obj))
+            for (i, val) in enumerate(obj)
+                @inbounds x[i] = constructfrom(eT, val)
+            end
+        else
+            x = eT[]
+            for val in obj
+                push!(x, constructfrom(eT, val))
+            end
+        end
+    else
+        x = collect(obj)
+    end
+    return construct(T, x)
+end
+
+constructfrom(::DictType, ::Type{T}, obj) where {T} =
+    constructfrom(DictType(), T, Any, Any, obj)
+constructfrom(::DictType, ::Type{NamedTuple}, obj) =
+    constructfrom(DictType(), NamedTuple, Symbol, Any, obj)
+constructfrom(::DictType, ::Type{Dict}, obj) =
+    constructfrom(DictType(), Dict, Any, Any, obj)
+constructfrom(::DictType, ::Type{T}, obj) where {T <: AbstractDict} =
+    constructfrom(DictType(), T, keytype(T), valtype(T), obj)
+
+function constructfrom(::DictType, ::Type{T}, ::Type{K}, ::Type{V}, obj) where {T, K, V}
+    d = Dict{K, V}()
+    for (k, v) in keyvaluepairs(obj)
+        d[constructfrom(K, k)] = constructfrom(V, v)
+    end
+    return construct(T, d)
+end
+
+constructfrom(::Mutable, ::Type{T}, obj) where {T} =
+    constructfrom!(Mutable(), T(), obj)
+
+struct Closure{T}
+    v::T
+end
+
+@inline (f::Closure{T})(i, nm, TT; kw...) where {T} =
+    constructfrom(TT, f.v)
+
+constructfrom!(::Mutable, x::T, obj::S) where {T, S} =
+    constructfrom!(Mutable(), x::T, StructType(S), obj)
+
+function constructfrom!(::Mutable, x::T, ::DictType, obj) where {T}
+    for (k, v) in keyvaluepairs(obj)
+        applyfield!(Closure(v), x, k)
+    end
+    return x
+end
+
+struct ObjClosure{T}
+    x::T
+end
+
+@inline function (f::ObjClosure{TT})(i, nm, ::Type{FT}, v::T; kw...) where {TT, FT, T}
+    applyfield!(Closure(v), f.x, nm)
+    return
+end
+
+function constructfrom!(::Mutable, x::T, ::Union{Struct, Mutable}, obj) where {T}
+    foreachfield(ObjClosure(x), obj)
+    return x
+end
+
+constructfrom(::Struct, ::Type{T}, obj::S) where {T, S} =
+    constructfrom(Struct(), T, StructType(S), obj)
+
+struct DictClosure{T}
+    obj::T
+end
+
+@inline function (f::DictClosure{T})(i, nm, ::Type{FT}) where {T, FT}
+    if haskey(f.obj, nm)
+        return constructfrom(FT, getindex(f.obj, nm))
+    end
+    return nothing
+end
+
+constructfrom(::Struct, ::Type{T}, ::DictType, obj) where {T} =
+    construct(DictClosure(obj), T)
+
+struct StructClosure{T}
+    obj::T
+end
+
+@inline function (f::StructClosure{T})(i, nm, ::Type{FT}) where {T, FT}
+    if hasfield(T, nm)
+        return constructfrom(FT, getfield(f.obj, nm))
+    end
+    return nothing
+end
+
+constructfrom(::Struct, ::Type{T}, ::Union{Struct, Mutable}, obj) where {T} =
+    construct(StructClosure(obj), T)
 
 end # module
