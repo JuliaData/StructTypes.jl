@@ -418,6 +418,39 @@ end
 
 end
 
+abstract type Vehicle end
+
+struct Car <: Vehicle
+    type::String
+    make::String
+    model::String
+    seatingCapacity::Int
+    topSpeed::Float64
+end
+
+struct Truck <: Vehicle
+    type::String
+    make::String
+    model::String
+    payloadCapacity::Float64
+end
+
+StructTypes.StructType(::Type{Vehicle}) = StructTypes.AbstractType()
+StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
+
+StructTypes.StructType(::Type{Car}) = StructTypes.Struct()
+StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
+
+mutable struct C2
+    a::Int
+    b::Float64
+    c::String
+    C2() = new()
+    C2(a::Int, b::Float64, c::String) = new(a, b, c)
+end
+
+StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
+
 @testset "makeobj" begin
     @testset "makeobj" begin
         cases = [
@@ -431,14 +464,14 @@ end
             (Integer,           Int,               1),
             (Int,               Int,               1),
             (Any,               Vector{Int},       [1, 2, 3]),
-            (Vector,            Vector{Int},       [1, 2, 3]),
+            (Vector,            Vector{Any},       [1, 2, 3]),
             (Vector{Any},       Vector{Any},       [1, 2, 3]),
             (Vector{Real},      Vector{Real},      [1, 2, 3]),
             (Vector{Integer},   Vector{Integer},   [1, 2, 3]),
             (Vector{Int},       Vector{Int},       [1, 2, 3]),
             (Any,               Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
-            (AbstractDict,      Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
-            (Dict,              Dict{Symbol, Int}, Dict(:a => 1, :b => 2)),
+            (AbstractDict,      Dict{Any, Any}, Dict(:a => 1, :b => 2)),
+            (Dict,              Dict{Any, Any}, Dict(:a => 1, :b => 2)),
             (Dict{Any, Any},    Dict{Any, Any},    Dict(:a => 1, :b => 2)),
             (Dict{Symbol, Any}, Dict{Symbol, Any}, Dict(:a => 1, :b => 2)),
             (Dict{Any, Int},    Dict{Any, Int},    Dict(:a => 1, :b => 2)),
@@ -448,28 +481,35 @@ end
             a = case[1]
             b = case[2]
             c = case[3]
-            @test typeof(StructTypes.makeobj(a, c)) === b
-            @test StructTypes.makeobj(a, c) == c
+            @test typeof(StructTypes.constructfrom(a, c)) == b
+            @test StructTypes.constructfrom(a, c) == c
         end
     end
     @testset "mutable structs" begin
-        @testset "makeobj" begin
+        @testset "constructfrom" begin
             input = Dict(:a => 1, :b => 2.0, :c => "three")
-            output = StructTypes.makeobj(C, input)
-            @test typeof(output) === C
+            output = StructTypes.constructfrom(C2, input)
+            @test typeof(output) === C2
             @test output.a == 1
             @test output.b == 2.0
             @test output.c == "three"
+            dict = Dict(:type => "car", :make => "Mercedes-Benz", :model => "S500", :seatingCapacity => 5, :topSpeed => 250.1)
+            car = StructTypes.constructfrom(Vehicle, dict)
+            @test typeof(car) == Car
+            @test car.make == "Mercedes-Benz"
         end
-        @testset "makeobj!" begin
+        @testset "constructfrom!" begin
             input = Dict(:a => 1, :b => 2.0, :c => "three")
-            x = C()
-            output = StructTypes.makeobj!(x, input)
+            x = C2()
+            output = StructTypes.constructfrom!(x, input)
             @test x === output
-            @test typeof(x) === C
+            @test typeof(x) === C2
             @test x.a == 1
             @test x.b == 2.0
             @test x.c == "three"
+            @test StructTypes.constructfrom(Tuple{Int64, Float64, String}, [1, 2.0, "three"]) == (1, 2.0, "three")
+            @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, input) == (a=1, b=2.0, c="three")
+            @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, x) == (a=1, b=2.0, c="three")
         end
     end
 end
