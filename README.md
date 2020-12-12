@@ -1,6 +1,6 @@
 # StructTypes
 
-[![Build Status](https://travis-ci.org/JuliaData/StructTypes.jl.svg?branch=master)](https://travis-ci.org/JuliaData/StructTypes.jl)
+[![Build Status](https://github.com/JuliaData/StructTypes.jl/workflows/CI/badge.svg)](https://github.com/JuliaData/StructTypes.jl/actions?query=workflow%3ACI+branch%3Amaster)
 [![codecov](https://codecov.io/gh/JuliaData/StructTypes.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaData/StructTypes.jl)
 
 Package providing the `StructTypes.StructType` trait for Julia types to declare the kind of "struct" they are,

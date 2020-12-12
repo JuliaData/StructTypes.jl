@@ -135,10 +135,9 @@ StructTypes.AbstractType
 Several utility functions are provided for fellow package authors wishing to utilize the `StructTypes.StructType` trait to integrate in their package. Due to the complexity of correctly handling the various configuration options with `StructTypes.Mutable` and some of the interface types, it's strongly recommended to rely on these utility functions and open issues for concerns or missing functionality.
 
 ```@docs
+StructTypes.constructfrom
 StructTypes.construct
 StructTypes.foreachfield
 StructTypes.mapfields!
 StructTypes.applyfield!
-StructTypes.makeobj
-StructTypes.makeobj!
 ```
