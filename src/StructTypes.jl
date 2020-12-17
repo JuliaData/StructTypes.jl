@@ -544,27 +544,6 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
              x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
 end
 
-@inline function construct(f, T::Type{NamedTuple{names, types}}) where {names, types}
-    N = length(names)
-    constructor = ((x...) -> T(tuple(x...)))
-    # unroll first 32 fields
-    Base.@nexprs 32 i -> begin
-        @inbounds k_i = names[i]
-        x_i = f(i, k_i, fieldtype(types, i))
-        if N == i
-            return Base.@ncall(i, constructor, x)
-        end
-    end
-    vals = []
-    for i = 33:N
-        @inbounds k_i = names[i]
-        x_i = f(i, k_i, fieldtype(types, i))
-        push!(vals, x_i)
-    end
-    return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,
-             x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, vals...)
-end
-
 Base.@pure function symbolin(names::Union{Tuple{Vararg{Symbol}}, Bool}, name::Symbol)
     names isa Bool && return names
     for nm in names
@@ -769,6 +748,71 @@ mappings will be applied, and the function will be passed the Julia field name.
         end
     )
     return f_applied
+end
+
+"""
+    StructTypes.applyfield(f, ::Type{T}, nm::Symbol) => Bool
+
+Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
+apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
+any keyword arguments `kw` defined in `StructTypes.keywordargs`, setting the field value to the return
+value of `f`. Various StructType configurations are respected like keyword arguments, names, and exclusions.
+`applyfield` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
+will be returned (important for applications where the input still needs to consume the field, like json parsing).
+Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
+mappings will be applied, and the function will be passed the Julia field name.
+"""
+@inline function applyfield(f, ::Type{T}, nm::Symbol) where {T}
+    N = fieldcount(T)
+    excl = excludes(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    nm = julianame(nms, nm)
+    f_applied = false
+    # unroll the first 32 field checks to avoid dynamic dispatch if possible
+    Base.@nif(
+        33,
+        i -> (i <= N && Base.fieldindex(T, nm) === i && !symbolin(excl, nm)),
+        i -> begin
+            FT_i = fieldtype(T, i)
+            if haskey(kwargs, nm)
+                y_i = f(i, nm, FT_i; kwargs[nm]...)
+            else
+                y_i = f(i, nm, FT_i)
+            end
+            f_applied = true
+        end,
+        i -> begin
+            for j in 33:N
+                (Base.fieldindex(T, nm) === j && !symbolin(excl, nm)) || continue
+                FT_j = fieldtype(T, j)
+                if haskey(kwargs, nm)
+                    y_j = f(j, nm, FT_j; kwargs[nm]...)
+                else
+                    y_j = f(j, nm, FT_j)
+                end
+                f_applied = true
+                break
+            end
+        end
+    )
+    return f_applied
+end
+
+@inline function construct(::Type{T}, values::Vector{Any}) where {T}
+    N = fieldcount(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
+    # unroll first 32 fields
+    Base.@nexprs 32 i -> begin
+        x_i = values[i]::fieldtype(T, i)
+        if N == i
+            return Base.@ncall(i, constructor, x)
+        end
+    end
+    return constructor(x_1, x_2, x_3, x_4, x_5, x_6, x_7, x_8, x_9, x_10, x_11, x_12, x_13, x_14, x_15, x_16,
+             x_17, x_18, x_19, x_20, x_21, x_22, x_23, x_24, x_25, x_26, x_27, x_28, x_29, x_30, x_31, x_32, values[33:N]...)
 end
 
 @static if Base.VERSION < v"1.2"
