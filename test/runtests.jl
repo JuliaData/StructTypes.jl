@@ -10,6 +10,9 @@ end
 
 @enum Fruit apple orange
 
+struct EmptyStruct
+end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
@@ -286,6 +289,9 @@ function f3(i, nm, T, v; hey=:hey)
     @test vals[i] == v
 end
 StructTypes.foreachfield(f3, LotsOfFields(vals...))
+
+@test StructTypes.foreachfield(() -> nothing, EmptyStruct()) === nothing
+@test StructTypes.mapfields!(() -> nothing, EmptyStruct()) === nothing
 
 x = C()
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x)

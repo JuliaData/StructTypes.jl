@@ -588,6 +588,7 @@ Various "configurations" are respected when applying `f` to each field:
 """
 @inline function foreachfield(f, x::T) where {T}
     N = fieldcount(T)
+    N == 0 && return
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)
@@ -639,6 +640,7 @@ StructTypes configurations in terms of skipping/naming/passing keyword arguments
 """
 @inline function mapfields!(f, x::T) where {T}
     N = fieldcount(T)
+    N == 0 && return
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)
