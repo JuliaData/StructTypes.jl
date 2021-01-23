@@ -686,7 +686,6 @@ mappings will be applied, and the function will be passed the Julia field name.
 """
 @inline function applyfield!(f, x::T, nm::Symbol) where {T}
     N = fieldcount(T)
-    N == 0 && return true
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)

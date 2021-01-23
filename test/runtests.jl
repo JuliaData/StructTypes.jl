@@ -292,7 +292,6 @@ StructTypes.foreachfield(f3, LotsOfFields(vals...))
 
 @test StructTypes.foreachfield(() -> nothing, EmptyStruct()) === nothing
 @test StructTypes.mapfields!(() -> nothing, EmptyStruct()) === nothing
-@test StructTypes.applyfield!(() -> nothing, EmptyStruct())
 
 x = C()
 StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x)
