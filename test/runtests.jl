@@ -113,6 +113,8 @@ x = "499beb72-22ea-11ea-3366-55749430b981"
 @test StructTypes.subtypes(A) == NamedTuple()
 @test StructTypes.subtypes(A(1)) == NamedTuple()
 
+@test StructTypes.construct(Date, Date(2020)) == Date(2020)
+
 end
 
 struct B
