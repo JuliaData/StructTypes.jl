@@ -242,7 +242,7 @@ abstract type InterfaceType end
 Function that custom types can overload for their `T` to construct an instance, given `args...` and `kw...`.
 The default definition is `StructTypes.construct(T, args...; kw...) = T(args...; kw...)`.
 """
-function construct end
+construct(T, args...; kw...) = T(args...; kw...)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.DictType()
