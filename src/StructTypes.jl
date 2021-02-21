@@ -628,6 +628,54 @@ Various "configurations" are respected when applying `f` to each field:
 end
 
 """
+    StructTypes.foreachfield(f, T) => Nothing
+
+Apply function `f(i, name, FT; kw...)` over each field index `i`, field name `name`, field type `FT`, 
+and any `kw` keyword arguments defined in `StructTypes.keywordargs` for `name` on type `T`.
+Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` over collections.
+
+Various "configurations" are respected when applying `f` to each field:
+  * If keyword arguments have been defined for a field via `StructTypes.keywordargs`, they will be passed like `f(i, name, FT, v; kw...)`
+  * If `StructTypes.names` has been defined, `name` will be the serialization name instead of the defined julia field name
+  * If a field is undefined or empty and `StructTypes.omitempties` is defined, `f` won't be applied to that field
+  * If a field has been excluded via `StructTypes.excludes`, it will be skipped
+"""
+@inline function foreachfield(f, ::Type{T}) where {T}
+    N = fieldcount(T)
+    N == 0 && return
+    excl = excludes(T)
+    nms = names(T)
+    kwargs = keywordargs(T)
+    emp = omitempties(T)
+    Base.@nexprs 32 i -> begin
+        k_i = fieldname(T, i)
+        if !symbolin(excl, k_i)
+            if haskey(kwargs, k_i)
+                f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
+            else
+                f(i, serializationname(nms, k_i), fieldtype(T, i))
+            end
+        end
+        N == i && @goto done
+    end
+    if N > 32
+        for i = 33:N
+            k_i = fieldname(T, i)
+            if !symbolin(excl, k_i)
+                if haskey(kwargs, k_i)
+                    f(i, serializationname(nms, k_i), fieldtype(T, i); kwargs[k_i]...)
+                else
+                    f(i, serializationname(nms, k_i), fieldtype(T, i))
+                end
+            end
+        end
+    end
+
+@label done
+    return
+end
+
+"""
     StructTypes.mapfields!(f, x::T)
 
 Applys the function `f(i, name, FT; kw...)` to each field index `i`, field name `name`, field type `FT`,
