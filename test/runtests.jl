@@ -49,7 +49,7 @@ end
 @test StructTypes.idproperty(A(1)) == :_
 
 @test StructTypes.StructType(Dict) == StructTypes.DictType()
-@test StructTypes.StructType(NamedTuple) == StructTypes.Struct()
+@test StructTypes.StructType(NamedTuple) == StructTypes.DictType()
 @test StructTypes.StructType(Pair) == StructTypes.DictType()
 
 x = Dict(1 => 2)
