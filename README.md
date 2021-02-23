@@ -10,6 +10,11 @@ Package providing the `StructTypes.StructType` trait for Julia types to declare 
 providing serialization/deserialization packages patterns and strategies to automatically construct objects. To
 learn more, check out the documentation links below.
 
+**Installation**: at the Julia REPL, `import Pkg; Pkg.add("StructTypes")`
+
+**Maintenance**: StructTypes is maintained collectively by the [JuliaData collaborators](https://github.com/orgs/JuliaData/people).
+Responsiveness to pull requests and issues can vary, depending on the availability of key collaborators.
+
 ### Documentation
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://juliadata.github.io/StructTypes.jl/stable)
