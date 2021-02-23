@@ -49,7 +49,7 @@ end
 @test StructTypes.idproperty(A(1)) == :_
 
 @test StructTypes.StructType(Dict) == StructTypes.DictType()
-@test StructTypes.StructType(NamedTuple) == StructTypes.DictType()
+@test StructTypes.StructType(NamedTuple) == StructTypes.Struct()
 @test StructTypes.StructType(Pair) == StructTypes.DictType()
 
 x = Dict(1 => 2)
@@ -515,7 +515,7 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
             @test x.a == 1
             @test x.b == 2.0
             @test x.c == "three"
-            @test StructTypes.constructfrom(Tuple{Int64, Float64, String}, [1, 2.0, "three"]) == (1, 2.0, "three")
+            @test StructTypes.constructfrom(Tuple{Int64, Float64, String}, Union{Int64, Float64, String}[Int64(1), 2.0, "three"]) == (1, 2.0, "three")
             @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, input) == (a=1, b=2.0, c="three")
             @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, x) == (a=1, b=2.0, c="three")
         end
