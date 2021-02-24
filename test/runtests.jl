@@ -49,7 +49,7 @@ end
 @test StructTypes.idproperty(A(1)) == :_
 
 @test StructTypes.StructType(Dict) == StructTypes.DictType()
-@test StructTypes.StructType(NamedTuple) == StructTypes.DictType()
+@test StructTypes.StructType(NamedTuple) == StructTypes.Struct()
 @test StructTypes.StructType(Pair) == StructTypes.DictType()
 
 x = Dict(1 => 2)
@@ -233,24 +233,27 @@ end
 DateStruct() = DateStruct(Date(0), DateTime(0), Time(0))
 Base.:(==)(a::DateStruct, b::DateStruct) = a.date == b.date && a.datetime == b.datetime && a.time == b.time
 
+struct EmptyStruct end
+
 @testset "convenience functions" begin
 
 ## StructTypes.construct
 # simple struct
-@test StructTypes.construct((i, nm, T) -> 1, A) == A(1)
-@inferred StructTypes.construct((i, nm, T) -> 1, A)
+@test @inferred StructTypes.construct((i, nm, T) -> 1, A) == A(1)
+
+@test StructTypes.construct(() -> nothing, EmptyStruct) == EmptyStruct()
 
 # hetero fieldtypes struct
-@test StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], B) == B(1, 3.14, "hey")
-@inferred StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], B)
+@test @inferred StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], B) == B(1, 3.14, "hey")
 
 # simple tuple
-@test StructTypes.construct((i, nm, T) -> 1, Tuple{Int}) == (1,)
-@inferred StructTypes.construct((i, nm, T) -> 1, Tuple{Int})
+@test @inferred StructTypes.construct((i, nm, T) -> 1, Tuple{Int}) == (1,)
+
+# NamedTuple
+@test @inferred StructTypes.construct((i, nm, T) -> (c="hey", a=1, b=3.14)[nm], NamedTuple{(:a, :b, :c), Tuple{Int, Float64, String}}) == (a=1, b=3.14, c="hey")
 
 # hetero fieldtypes tuple
-@test StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], Tuple{Int, Float64, String}) == (1, 3.14, "hey")
-@inferred StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], Tuple{Int, Float64, String})
+@test @inferred StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], Tuple{Int, Float64, String}) == (1, 3.14, "hey")
 
 # > 32 fields
 vals = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -402,6 +405,14 @@ StructTypes.foreachfield(x6) do i, nm, T, v
 end
 @test sort(all_i) == [1, 3]
 @test sort(all_nm) == [:a, :c]
+
+CNT = Ref(0)
+StructTypes.foreachfield((args...) -> CNT[] += 1, EmptyStruct)
+@test CNT[] == 0
+
+@testset "StructTypes.constructfrom(T, ::Vector{Any})" begin
+
+end
 
 @testset "issue 22 (`applyfield!` skips the 32nd field)" begin
     function f4(i::Integer, name::Symbol, ::Type{FT}) where FT

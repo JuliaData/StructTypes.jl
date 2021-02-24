@@ -5,25 +5,37 @@ using UUIDs, Dates
 "Abstract super type of various `StructType`s; see `StructTypes.DataType`, `StructTypes.InterfaceType`, and `StructTypes.AbstractType` for more specific kinds of `StructType`s"
 abstract type StructType end
 
+StructType(x::T) where {T} = StructType(T)
+
 "Default `StructTypes.StructType` for types that don't have a `StructType` defined; this ensures objects must have an explicit `StructType` to avoid unanticipated issues"
 struct NoStructType <: StructType end
+
+StructType(::Type{T}) where {T} = NoStructType()
 
 "A kind of `StructType` where an object's \"data\" is made up, at least in part, by its direct fields. When serializing, appropriate fields will be accessed directly."
 abstract type DataType <: StructType end
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.Struct()
+    StructTypes.StructType(::Type{T}) = StructTypes.UnorderedStruct()
+    StructTypes.StructType(::Type{T}) = StructTypes.OrderedStruct()
 
-Signal that `T` can participate in a simplified, performant struct serialization by relying on reliable field order when serializing/deserializing.
-In particular, when deserializing, parsed input fields are passed directly, in input order to the `T` constructor, like `T(field1, field2, field3)`.
-This means that any field names are ignored when deserializing; fields are directly passed to `T` in the order they're encountered.
+Signal that `T` is an immutable type who's fields should be used directly when serializing/deserializing.
+If a type is defined as `StructTypes.Struct`, it defaults to `StructTypes.UnorderedStruct`, which means its fields
+are allowed to be serialized/deserialized in any order, as opposed to `StructTypes.OrderedStruct` which signals that
+serialization/deserialization *must* occur in its defined field order exclusively. This can enable optimizations when
+an order can be guaranteed, but care must be taken to ensure any serialization formats can properly guarantee the order
+(for example, the JSON specification doesn't explicitly require ordered fields for "objects", though most implementations
+have a way to support this).
+For example, when deserializing a `Struct.OrderedStruct`, parsed input fields are passed directly, in input order to the `T` constructor, like `T(field1, field2, field3)`.
+This means that field names may be ignored when deserializing; fields are directly passed to `T` in the order they're encountered.
 
-For example, for reading a `StructTypes.Struct()` from a JSON string input, each key-value pair is read in the order it is encountered in the JSON input, the keys are ignored, and the values are directly passed to the type at the end of the object parsing like `T(val1, val2, val3)`.
+Another example, for reading a `StructTypes.OrderedStruct()` from a JSON string input, each key-value pair is read in the order it is encountered in the JSON input, the keys are ignored, and the values are directly passed to the type at the end of the object parsing like `T(val1, val2, val3)`.
 Yes, the JSON specification says that Objects are specifically **un-ordered** collections of key-value pairs,
 but the truth is that many JSON libraries provide ways to maintain JSON Object key-value pair order when reading/writing.
 Because of the minimal processing done while parsing, and the "trusting" that the Julia type constructor will be able to handle fields being present, missing, or even extra fields that should be ignored,
 this is the fastest possible method for mapping a JSON input to a Julia structure.
-If your workflow interacts with non-Julia APIs for sending/receiving JSON, you should take care to test and confirm the use of `StructTypes.Struct()` in the cases mentioned above: what if a field is missing when parsing? what if the key-value pairs are out of order? what if there extra fields get included that weren't anticipated? If your workflow is questionable on these points, or it would be too difficult to account for these scenarios in your type constructor, it would be better to consider the `StructTypes.Mutable()` option.
+If your workflow interacts with non-Julia APIs for sending/receiving JSON, you should take care to test and confirm the use of `StructTypes.OrderedStruct()` in the cases mentioned above: what if a field is missing when parsing? what if the key-value pairs are out of order? what if there extra fields get included that weren't anticipated? If your workflow is questionable on these points, or it would be too difficult to account for these scenarios in your type constructor, it would be better to consider the `StructTypes.UnorderedStruct` or `StructTypes.Mutable()` options.
 
 ```@example
 struct CoolType
@@ -32,15 +44,27 @@ struct CoolType
     val3::String
 end
 
-StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
+StructTypes.StructType(::Type{CoolType}) = StructTypes.OrderedStruct()
 
 # JSON3 package as example
 @assert JSON3.read("{\"val1\": 1, \"val2\": 2, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
 # note how `val2` field is first, then `val1`, but fields are passed *in-order* to `CoolType` constructor; BE CAREFUL!
 @assert JSON3.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(2, 1, "3")
+# if we instead define `Struct`, which defaults to `StructTypes.UnorderedStruct`, then the above example works
+StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
+@assert JSON3.read("{\"val2\": 2, \"val1\": 1, \"val3\": 3}", CoolType) == CoolType(1, 2, "3")
 ```
 """
-struct Struct <: DataType end
+abstract type Struct <: DataType end
+
+struct UnorderedStruct <: Struct end
+struct OrderedStruct <: Struct end
+
+Struct() = UnorderedStruct()
+
+StructType(u::Union) = Struct()
+StructType(::Type{Any}) = Struct()
+StructType(::Type{<:NamedTuple}) = Struct()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.Mutable()
@@ -72,11 +96,6 @@ There are a few additional helper methods that can be utilized by `StructTypes.M
 * `StructTypes.keywordargs(::Type{T}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))`: provide keyword arguments for fields of type `T` that should be passed to functions that set values for this field. Define `StructTypes.keywordargs` as a NamedTuple of NamedTuples.
 """
 struct Mutable <: DataType end
-
-StructType(u::Union) = Struct()
-StructType(::Type{Any}) = Struct()
-StructType(::Type{T}) where {T} = NoStructType()
-StructType(x::T) where {T} = StructType(T)
 
 """
     StructTypes.names(::Type{T}) = ((:juliafield1, :serializedfield1), (:juliafield2, :serializedfield2))
@@ -269,14 +288,12 @@ The interface to satisfy for serializing is:
 struct DictType <: InterfaceType end
 
 StructType(::Type{<:AbstractDict}) = DictType()
-StructType(::Type{<:NamedTuple}) = DictType()
 StructType(::Type{<:Pair}) = DictType()
 
 keyvaluepairs(x) = pairs(x)
 keyvaluepairs(x::Pair) = (x,)
 
 construct(::Type{Dict{K, V}}, x::Dict{K, V}; kw...) where {K, V} = x
-construct(T, x::Dict{K, V}; kw...) where {K, V} = T(x)
 
 construct(::Type{NamedTuple}, x::Dict; kw...) = NamedTuple{Tuple(keys(x))}(values(x))
 construct(::Type{NamedTuple{names}}, x::Dict; kw...) where {names} = NamedTuple{names}(Tuple(x[nm] for nm in names))
@@ -309,9 +326,6 @@ struct ArrayType <: InterfaceType end
 StructType(::Type{<:AbstractArray}) = ArrayType()
 StructType(::Type{<:AbstractSet}) = ArrayType()
 StructType(::Type{<:Tuple}) = ArrayType()
-
-construct(T, x::Vector{S}; kw...) where {S} = T(x)
-construct(::Type{Vector}, x::Vector; kw...) = x
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.StringType()
@@ -371,8 +385,6 @@ function construct(::Type{E}, sym::Symbol) where {E <: Enum}
     end
 end
 
-construct(T, str::String; kw...) = T(str)
-construct(T, sym::Symbol; kw...) = T(sym)
 construct(::Type{T}, str::String; kw...) where {T <: AbstractString} = convert(T, str)
 construct(T, ptr::Ptr{UInt8}, len::Int; kw...) = construct(T, unsafe_string(ptr, len); kw...)
 construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
@@ -402,7 +414,6 @@ struct NumberType <: InterfaceType end
 StructType(::Type{<:Real}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
-construct(T, x::Real; kw...) = T(x)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.BoolType()
@@ -422,7 +433,6 @@ The interface to satisfy for serializing is:
 struct BoolType <: InterfaceType end
 
 StructType(::Type{Bool}) = BoolType()
-construct(T, bool::Bool; kw...) = T(bool)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.NullType()
@@ -515,6 +525,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
 """
 @inline function construct(f, ::Type{T}) where {T}
     N = fieldcount(T)
+    N == 0 && return T()
     nms = names(T)
     kwargs = keywordargs(T)
     constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
@@ -799,8 +810,9 @@ mappings will be applied, and the function will be passed the Julia field name.
     return f_applied
 end
 
-@inline function constructfrom(::Type{T}, values::Vector{Any}) where {T}
+@inline function construct(values::Vector{Any}, ::Type{T}) where {T}
     N = fieldcount(T)
+    N == 0 && return T()
     nms = names(T)
     kwargs = keywordargs(T)
     constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
