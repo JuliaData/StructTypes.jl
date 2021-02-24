@@ -16,7 +16,7 @@ Depth = 3
 
 In general, custom Julia types tend to be one of: 1) "data types", 2) "interface types" or sometimes 3) "abstract types" with a known set of concrete subtypes. Data types tend to be "collection of fields" kind of types; fields are generally public and directly accessible, they might also be made to model "objects" in the object-oriented sense. In any case, the type is "nominal" in the sense that it's "made up" of the fields it has, sometimes even if just for making it more convenient to pass them around together in functions.
 
-Interface types, on the other hand, are characterized by **private** fields; they contain optimized representations "under the hood" to provide various features/functionality and are useful via interface methods implemented: iteration, `getindex`, accessor methods, etc. Many package-provided libraries or Base-provided structures are like this: `Dict`, `Array`, `Socket`, etc. For these types, their underlying fields are mostly cryptic and provide little value to users directly, and are often explictly documented as being implementation details and not to be accessed under warning of breakage.
+Interface types, on the other hand, are characterized by **private** fields; they contain optimized representations "under the hood" to provide various features/functionality and are useful via interface methods implemented: iteration, `getindex`, accessor methods, etc. Many package-provided libraries or Base-provided structures are like this: `Dict`, `Array`, `Socket`, etc. For these types, their underlying fields are mostly cryptic and provide little value to users directly, and are often explictly documented as being implementation details and not to be relied upon directly under warning of breakage.
 
 What does all this have to do with the `StructTypes.StructType` trait? A lot! There's often a desire to
 programmatically access the "public" names and values of an object, whether it's a data, interface, or abstract type.
@@ -63,7 +63,7 @@ StructTypes.Struct
 StructTypes.Mutable
 ```
 
-Support functions for `StructTypes.Mutable`:
+Support functions for `StructTypes.DataType`s:
 
 ```@docs
 StructTypes.names
@@ -140,4 +140,5 @@ StructTypes.construct
 StructTypes.foreachfield
 StructTypes.mapfields!
 StructTypes.applyfield!
+StructTypes.applyfield 
 ```
