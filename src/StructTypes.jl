@@ -2,7 +2,7 @@ module StructTypes
 
 using UUIDs, Dates
 
-"Abstract super type of various `StructType`s; see `StructTypes.DataType`, `StructTypes.InterfaceType`, and `StructTypes.AbstractType` for more specific kinds of `StructType`s"
+"Abstract super type of various `StructType`s; see `StructTypes.DataType`, `StructTypes.CustomType`, `StructTypes.InterfaceType`, and `StructTypes.AbstractType` for more specific kinds of `StructType`s"
 abstract type StructType end
 
 StructType(x::T) where {T} = StructType(T)
@@ -11,6 +11,45 @@ StructType(x::T) where {T} = StructType(T)
 struct NoStructType <: StructType end
 
 StructType(::Type{T}) where {T} = NoStructType()
+
+"""
+    StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
+
+Signal that `T` has a custom serialization/deserialization pattern that doesn't quite fit `StructTypes.DataType`
+or `StructTypes.InterfaceType`. One common example are wrapper types, where you want to serialize as the wrapped
+type and can reconstruct `T` manually from deserialized fields directly. Defining `CustomStruct()` requires
+overloading `StructTypes.lower(x::T)`, which should return any serializable object, and optionally overload
+`StructTypes.lowertype(::Type{T})`, which returns the type of the lowered object (it returns `Any` by default).
+`lowertype` is used to deserialize an object, which is then passed to `StructTypes.construct(T, obj)`
+for construction (which defaults to calling `T(obj)`).
+"""
+struct CustomStruct <: StructType end
+
+"""
+    StructTypes.lower(x::T)
+
+"Unwrap" or otherwise transform `x` to another object that has a well-defined `StructType` definition.
+This is a required method for types declaring `StructTypes.CustomStruct`.
+Allows objects of type `T` to conveniently serialize/deserialize as another type, when their own
+structure/definition isn't significant. Useful for wrapper types. See also
+[`StructTypes.CustomStruct`](@ref) and [`StructType.lowertype`](@ref).
+"""
+function lower end
+
+"""
+    StructTypes.lowertype(::Type{T})
+
+For `StructTypes.CustomStruct` types, they may optionally define `lowertype` to provide a
+"deserialization" type, which defaults to `Any`. When deserializing a type `T`, the
+deserializer will first call `StructTypes.lowertype(T) = S` and proceed with deserializing the
+type `S` that was returned. Once `S` has been deserialized, the deserializer will call
+`StructTypes.construct(T, x::S)`. With the default of `Any`, deserializers should return
+an `AbstractDict` object where key/values can be enumerated/checked/retrieved to make it
+decently convenient for `CustomStruct`s to construct themselves.
+"""
+function lowertype end
+
+lowertype(::Type{T}) where {T} = Any
 
 "A kind of `StructType` where an object's \"data\" is made up, at least in part, by its direct fields. When serializing, appropriate fields will be accessed directly."
 abstract type DataType <: StructType end
