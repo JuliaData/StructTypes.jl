@@ -14,19 +14,22 @@ Depth = 3
 
 ## `StructTypes.StructType`
 
-In general, custom Julia types tend to be one of: 1) "data types", 2) "interface types" or sometimes 3) "abstract types" with a known set of concrete subtypes. Data types tend to be "collection of fields" kind of types; fields are generally public and directly accessible, they might also be made to model "objects" in the object-oriented sense. In any case, the type is "nominal" in the sense that it's "made up" of the fields it has, sometimes even if just for making it more convenient to pass them around together in functions.
+In general, custom Julia types tend to be one of: 1) "data types", 2) "interface types" or sometimes 3) "custom types" or 4) "abstract types" with a known set of concrete subtypes. Data types tend to be "collection of fields" kind of types; fields are generally public and directly accessible, they might also be made to model "objects" in the object-oriented sense. In any case, the type is "nominal" in the sense that it's "made up" of the fields it has, sometimes even if just for making it more convenient to pass them around together in functions.
 
 Interface types, on the other hand, are characterized by **private** fields; they contain optimized representations "under the hood" to provide various features/functionality and are useful via interface methods implemented: iteration, `getindex`, accessor methods, etc. Many package-provided libraries or Base-provided structures are like this: `Dict`, `Array`, `Socket`, etc. For these types, their underlying fields are mostly cryptic and provide little value to users directly, and are often explictly documented as being implementation details and not to be relied upon directly under warning of breakage.
 
 What does all this have to do with the `StructTypes.StructType` trait? A lot! There's often a desire to
-programmatically access the "public" names and values of an object, whether it's a data, interface, or abstract type.
+programmatically access the "public" names and values of an object, whether it's a data, interface, custom or abstract type.
 For data types, this means each direct field name and value. For interface types, this means having an API
 to get the names and values (_ignoring_ direct fields). Similarly for programmatic _construction_, we need to specify how to construct the Julia structure given an arbitrary set of key-value pairs.
+
+For "custom" types, this is kind of a catchall for those types that don't really fit in the "data" or "interface" buckets; like wrapper types. You don't really care about the wrapper type itself
+but about the type it wraps with a few modifications.
 
 For abstract types, it can be useful to "bundle" the behavior of concrete subtypes under a single abstract type; and
 when serializing/deserializing, an extra key-value pair is added to encode the true concrete type.
 
-Each of these 3 kinds of struct type categories will be now be detailed.
+Each of these 4 kinds of struct type categories will be now be detailed.
 
 ### DataTypes
 
@@ -43,12 +46,14 @@ end
 
 In this case, our `Vehicle` type is entirely "made up" by its fields, `make`, `model`, and `year`.
 
-There are two ways to define the `StructTypes.StructType` of these kinds of objects:
+There are three ways to define the `StructTypes.StructType` of these kinds of objects:
 
 ```julia
-StructTypes.StructType(::Type{MyType}) = StructTypes.Struct()
+StructTypes.StructType(::Type{MyType}) = StructTypes.Struct() # an alias for StructTypes.UnorderedStruct()
 # or
 StructTypes.StructType(::Type{MyType}) = StructTypes.Mutable()
+# or
+StructTypes.StructType(::Type{MyType}) = StructTypes.OrderedStruct()
 ```
 
 #### `StructTypes.Struct`
@@ -61,6 +66,12 @@ StructTypes.Struct
 
 ```@docs
 StructTypes.Mutable
+```
+
+#### `StructTypes.OrderedStruct`
+
+```@docs
+StructTypes.OrderedStruct
 ```
 
 Support functions for `StructTypes.DataType`s:
@@ -124,6 +135,14 @@ StructTypes.BoolType
 StructTypes.NullType
 ```
 
+### CustomStruct
+
+```@docs
+StructTypes.CustomStruct
+StructTypes.lower
+StructTypes.lowertype
+```
+
 ### AbstractTypes
 
 ```@docs
@@ -140,5 +159,5 @@ StructTypes.construct
 StructTypes.foreachfield
 StructTypes.mapfields!
 StructTypes.applyfield!
-StructTypes.applyfield 
+StructTypes.applyfield
 ```
