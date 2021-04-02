@@ -66,6 +66,9 @@ serialization/deserialization *must* occur in its defined field order exclusivel
 an order can be guaranteed, but care must be taken to ensure any serialization formats can properly guarantee the order
 (for example, the JSON specification doesn't explicitly require ordered fields for "objects", though most implementations
 have a way to support this).
+
+For `StructTypes.UnorderedStruct`, if a field is missing from the serialization, `nothing` should be passed to the `StructTypes.construct` method.
+
 For example, when deserializing a `Struct.OrderedStruct`, parsed input fields are passed directly, in input order to the `T` constructor, like `T(field1, field2, field3)`.
 This means that field names may be ignored when deserializing; fields are directly passed to `T` in the order they're encountered.
 
