@@ -115,6 +115,10 @@ x = "499beb72-22ea-11ea-3366-55749430b981"
 
 @test StructTypes.construct(Date, Date(2020)) == Date(2020)
 
+# https://github.com/quinnj/JSON3.jl/issues/139
+v = v"1.2.3"
+@test StructTypes.StructType(v) == StructTypes.StringType()
+
 end
 
 struct B

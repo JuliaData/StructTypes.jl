@@ -402,6 +402,7 @@ StructType(::Type{<:Enum}) = StringType()
 StructType(::Type{<:AbstractChar}) = StringType()
 StructType(::Type{UUID}) = StringType()
 StructType(::Type{T}) where {T <: Dates.TimeType} = StringType()
+StructType(::Type{VersionNumber}) = StringType()
 
 function construct(::Type{Char}, str::String; kw...)
     if length(str) == 1
