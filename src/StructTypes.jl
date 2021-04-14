@@ -255,7 +255,7 @@ StructTypes.StructType(::Type{Spouse}) = StructTypes.Struct()
 struct Person
     id::Int
     name::String
-    spouse::Person
+    spouse::Spouse
 end
 
 StructTypes.StructType(::Type{Person}) = StructTypes.Struct()
