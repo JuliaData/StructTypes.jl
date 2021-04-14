@@ -13,6 +13,11 @@ end
 struct EmptyStruct
 end
 
+struct SomeFoo
+    id::Int
+    val::Union{Nothing, Some{Float64}}
+end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
@@ -118,6 +123,13 @@ x = "499beb72-22ea-11ea-3366-55749430b981"
 # https://github.com/quinnj/JSON3.jl/issues/139
 v = v"1.2.3"
 @test StructTypes.StructType(v) == StructTypes.StringType()
+
+# Some wrapper
+StructTypes.StructType(::Type{SomeFoo}) = StructTypes.Struct()
+x = SomeFoo(123, nothing)
+@test JSON3.read(JSON3.write(x), SomeFoo) == x
+x = SomeFoo(123, Some(3.14))
+@test JSON3.read(JSON3.write(x), SomeFoo) == x
 
 end
 
