@@ -119,6 +119,9 @@ x = "499beb72-22ea-11ea-3366-55749430b981"
 v = v"1.2.3"
 @test StructTypes.StructType(v) == StructTypes.StringType()
 
+# Some wrapper
+@test StructTypes.StructType(Some(1)) == StructTypes.CustomStruct()
+
 end
 
 struct B

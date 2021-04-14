@@ -51,6 +51,10 @@ function lowertype end
 
 lowertype(::Type{T}) where {T} = Any
 
+StructType(::Type{Some{T}}) where {T} = CustomStruct()
+lower(x::Some) = x.value
+lowertype(::Type{Some{T}}) where {T} = T
+
 "A kind of `StructType` where an object's \"data\" is made up, at least in part, by its direct fields. When serializing, appropriate fields will be accessed directly."
 abstract type DataType <: StructType end
 
