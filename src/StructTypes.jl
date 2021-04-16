@@ -308,6 +308,7 @@ Function that custom types can overload for their `T` to construct an instance, 
 The default definition is `StructTypes.construct(T, args...; kw...) = T(args...; kw...)`.
 """
 construct(T, args...; kw...) = T(args...; kw...)
+construct(::Type{T}, x::T; kw...) where {T} = x
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.DictType()
