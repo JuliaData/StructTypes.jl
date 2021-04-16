@@ -501,7 +501,7 @@ struct NullType <: InterfaceType end
 
 StructType(::Type{Nothing}) = NullType()
 StructType(::Type{Missing}) = NullType()
-construct(T, ::Nothing; kw...) = T()
+construct(::Type{T}, ::Nothing; kw...) where {T} = T()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.AbstractType()
