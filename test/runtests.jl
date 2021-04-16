@@ -122,6 +122,11 @@ v = v"1.2.3"
 # Some wrapper
 @test StructTypes.StructType(Some(1)) == StructTypes.CustomStruct()
 
+# 47
+@test StructTypes.construct(Nothing, nothing) === nothing
+x = Dict("hey" => "ho")
+@test StructTypes.construct(Dict{String, String}, x) === x
+
 end
 
 struct B

@@ -340,8 +340,6 @@ StructType(::Type{<:Pair}) = DictType()
 keyvaluepairs(x) = pairs(x)
 keyvaluepairs(x::Pair) = (x,)
 
-construct(::Type{Dict{K, V}}, x::Dict{K, V}; kw...) where {K, V} = x
-
 construct(::Type{NamedTuple}, x::Dict; kw...) = NamedTuple{Tuple(keys(x))}(values(x))
 construct(::Type{NamedTuple{names}}, x::Dict; kw...) where {names} = NamedTuple{names}(Tuple(x[nm] for nm in names))
 construct(::Type{NamedTuple{names, types}}, x::Dict; kw...) where {names, types} = NamedTuple{names, types}(Tuple(x[nm] for nm in names))
@@ -434,7 +432,7 @@ function construct(::Type{E}, sym::Symbol) where {E <: Enum}
 end
 
 construct(::Type{T}, str::String; kw...) where {T <: AbstractString} = convert(T, str)
-construct(T, ptr::Ptr{UInt8}, len::Int; kw...) = construct(T, unsafe_string(ptr, len); kw...)
+construct(::Type{T}, ptr::Ptr{UInt8}, len::Int; kw...) where {T} = construct(T, unsafe_string(ptr, len); kw...)
 construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
 construct(::Type{T}, str::String; dateformat::Dates.DateFormat=Dates.default_format(T), kw...) where {T <: Dates.TimeType} = T(str, dateformat)
 
@@ -501,7 +499,7 @@ struct NullType <: InterfaceType end
 
 StructType(::Type{Nothing}) = NullType()
 StructType(::Type{Missing}) = NullType()
-construct(T, ::Nothing; kw...) = T()
+construct(::Type{T}, ::Nothing; kw...) where {T} = T()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.AbstractType()
