@@ -13,6 +13,10 @@ end
 struct EmptyStruct
 end
 
+struct OmitEmp
+    x::Union{Nothing, Int}
+end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
@@ -126,6 +130,18 @@ v = v"1.2.3"
 @test StructTypes.construct(Nothing, nothing) === nothing
 x = Dict("hey" => "ho")
 @test StructTypes.construct(Dict{String, String}, x) === x
+
+# omitempties(T) = true respected
+StructTypes.StructType(::Type{OmitEmp}) = StructTypes.Struct()
+StructTypes.omitempties(::Type{OmitEmp}) = true
+StructTypes.foreachfield(OmitEmp(1)) do i, nm, T, val
+    @test val == 1
+end
+counter = 0
+StructTypes.foreachfield(OmitEmp(nothing)) do i, nm, T, val
+    counter += 1
+end
+@test counter == 0
 
 end
 
