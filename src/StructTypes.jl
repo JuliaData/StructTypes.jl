@@ -628,7 +628,7 @@ Various "configurations" are respected when applying `f` to each field:
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)
-    emp = omitempties(T)
+    emp = omitempties(T) === true ? fieldnames(T) : omitempties(T)
     Base.@nexprs 32 i -> begin
         k_i = fieldname(T, i)
         if !symbolin(excl, k_i) && isdefined(x, i)
@@ -673,7 +673,6 @@ Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` 
 Various "configurations" are respected when applying `f` to each field:
   * If keyword arguments have been defined for a field via `StructTypes.keywordargs`, they will be passed like `f(i, name, FT, v; kw...)`
   * If `StructTypes.names` has been defined, `name` will be the serialization name instead of the defined julia field name
-  * If a field is undefined or empty and `StructTypes.omitempties` is defined, `f` won't be applied to that field
   * If a field has been excluded via `StructTypes.excludes`, it will be skipped
 """
 @inline function foreachfield(f, ::Type{T}) where {T}
@@ -682,7 +681,6 @@ Various "configurations" are respected when applying `f` to each field:
     excl = excludes(T)
     nms = names(T)
     kwargs = keywordargs(T)
-    emp = omitempties(T)
     Base.@nexprs 32 i -> begin
         k_i = fieldname(T, i)
         if !symbolin(excl, k_i)
