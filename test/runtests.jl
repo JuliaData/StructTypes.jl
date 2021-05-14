@@ -17,6 +17,10 @@ struct OmitEmp
     x::Union{Nothing, Int}
 end
 
+struct IgnoreExtras
+    x::Int
+end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
@@ -145,6 +149,11 @@ StructTypes.foreachfield(OmitEmp(nothing)) do i, nm, T, val
     counter += 1
 end
 @test counter == 0
+
+# ignoreextras(T)
+@test_throws Exception StructTypes.applyfield(identity, IgnoreExtras, :x)
+StructTypes.ignoreextras(::Type{IgnoreExtras}) = true
+@test !StructTypes.applyfield(identity, IgnoreExtras, :x)
 
 end
 
@@ -373,7 +382,7 @@ StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 
 # NamedTuple
 @test StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}) == (a=1, b=3.14, c="hey")
-  
+
 x3 = D(nothing, 3.14, "")
 @inline StructTypes.omitempties(::Type{D}) = true
 all_i = Int[]
