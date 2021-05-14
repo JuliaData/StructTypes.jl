@@ -185,6 +185,17 @@ excludes(x::T) where {T} = excludes(T)
 excludes(::Type{T}) where {T} = ()
 
 """
+    StructTypes.ignoreextras(::Type{T}) = false
+
+Specify for a `StructType` whether unexpected keys should be ignored when deserializing, or whether they should throw an error.
+By default, an error is thrown.
+"""
+function ignoreextras end
+
+ignoreextras(x::T) where {T} = ignoreextras(T)
+ignoreextras(::Type{T}) where {T} = false
+
+"""
     StructTypes.omitempties(::Type{T}) = (:field1, :field2)
     StructTypes.omitempties(::Type{T}) = true
 
@@ -666,7 +677,7 @@ end
 """
     StructTypes.foreachfield(f, T) => Nothing
 
-Apply function `f(i, name, FT; kw...)` over each field index `i`, field name `name`, field type `FT`, 
+Apply function `f(i, name, FT; kw...)` over each field index `i`, field name `name`, field type `FT`,
 and any `kw` keyword arguments defined in `StructTypes.keywordargs` for `name` on type `T`.
 Nothing is returned and results from `f` are ignored. Similar to `Base.foreach` over collections.
 
@@ -821,13 +832,15 @@ mappings will be applied, and the function will be passed the Julia field name.
     N = fieldcount(T)
     excl = excludes(T)
     nms = names(T)
+    ig_ex = ignoreextras(T)
     kwargs = keywordargs(T)
     nm = julianame(nms, nm)
     f_applied = false
+    fieldindex(T, nm) = ig_ex && !hasfield(T, nm) ? nothing : Base.fieldindex(T, nm)
     # unroll the first 32 field checks to avoid dynamic dispatch if possible
     Base.@nif(
         33,
-        i -> (i <= N && Base.fieldindex(T, nm) === i && !symbolin(excl, nm)),
+        i -> (i <= N && fieldindex(T, nm) === i && !symbolin(excl, nm)),
         i -> begin
             FT_i = fieldtype(T, i)
             if haskey(kwargs, nm)
@@ -839,7 +852,7 @@ mappings will be applied, and the function will be passed the Julia field name.
         end,
         i -> begin
             for j in 33:N
-                (Base.fieldindex(T, nm) === j && !symbolin(excl, nm)) || continue
+                (fieldindex(T, nm) === j && !symbolin(excl, nm)) || continue
                 FT_j = fieldtype(T, j)
                 if haskey(kwargs, nm)
                     y_j = f(j, nm, FT_j; kwargs[nm]...)

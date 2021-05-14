@@ -36,6 +36,9 @@ end
 @test StructTypes.omitempties(A) == ()
 @test StructTypes.omitempties(A(1)) == ()
 
+@test !StructTypes.ignoreextras(A)
+@test !StructTypes.ignoreextras(A())
+
 @test StructTypes.isempty([])
 @test StructTypes.isempty(Dict())
 @test StructTypes.isempty("")

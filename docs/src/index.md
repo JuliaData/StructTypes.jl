@@ -79,6 +79,7 @@ Support functions for `StructTypes.DataType`s:
 ```@docs
 StructTypes.names
 StructTypes.excludes
+StructTypes.ignoreextras
 StructTypes.omitempties
 StructTypes.keywordargs
 StructTypes.idproperty
