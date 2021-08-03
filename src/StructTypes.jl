@@ -507,7 +507,7 @@ construct(::Type{T}, ::Nothing; kw...) where {T} = T()
 Signal that `T` is an abstract type, and when deserializing, one of its concrete subtypes will be materialized,
 based on a "type" key/field in the serialization object.
 
-Thus, `StructTypes.AbstractType`s *must* define `StructTypes.subtypes`, which should be a NamedTuple with subtype keys mapping to concrete Julia subtype values. You may optionally define `StructTypes.subtypekey` that indicates which input key/field name should be used for identifying the appropriate concrete subtype. A quick example should help illustrate proper use of this `StructType`:
+Thus, `StructTypes.AbstractType`s *must* define `StructTypes.subtypes`, which should be a NamedTuple with subtype keys mapping to concrete Julia subtype values. You may optionally define `StructTypes.subtypekey` that indicates which input key/field name should be used for identifying the appropriate concrete subtype. A quick example using the JSON3.jl package should help illustrate proper use of this `StructType`:
 ```julia
 abstract type Vehicle end
 
@@ -533,7 +533,7 @@ StructTypes.subtypekey(::Type{Vehicle}) = :type
 StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
 
 # example from StructTypes deserialization
-car = StructTypes.read(\"\"\"
+car = JSON3.read(\"\"\"
 {
     "type": "car",
     "make": "Mercedes-Benz",
