@@ -68,12 +68,6 @@ StructTypes.Struct
 StructTypes.Mutable
 ```
 
-#### `StructTypes.OrderedStruct`
-
-```@docs
-StructTypes.OrderedStruct
-```
-
 Support functions for `StructTypes.DataType`s:
 
 ```@docs
