@@ -438,7 +438,7 @@ CNT = Ref(0)
 StructTypes.foreachfield((args...) -> CNT[] += 1, EmptyStruct)
 @test CNT[] == 0
 
-@test !StructTypes.applyfield((x...) -> 10, A, :y)
+@test !StructTypes.applyfield((x...) -> 10, A, :z)
 
 @testset "StructTypes.constructfrom(T, ::Vector{Any})" begin
 
