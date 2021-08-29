@@ -827,7 +827,7 @@ mappings will be applied, and the function will be passed the Julia field name.
     # unroll the first 32 field checks to avoid dynamic dispatch if possible
     Base.@nif(
         33,
-        i -> (i <= N && Base.fieldindex(T, nm) === i && !symbolin(excl, nm)),
+        i -> (i <= N && fieldname(T, i) === nm && !symbolin(excl, nm)),
         i -> begin
             FT_i = fieldtype(T, i)
             if haskey(kwargs, nm)
@@ -839,7 +839,7 @@ mappings will be applied, and the function will be passed the Julia field name.
         end,
         i -> begin
             for j in 33:N
-                (Base.fieldindex(T, nm) === j && !symbolin(excl, nm)) || continue
+                (fieldname(T, j) === nm && !symbolin(excl, nm)) || continue
                 FT_j = fieldtype(T, j)
                 if haskey(kwargs, nm)
                     y_j = f(j, nm, FT_j; kwargs[nm]...)

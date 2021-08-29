@@ -370,7 +370,7 @@ StructTypes.mapfields!((i, nm, T) -> (1, 3.14, "hey")[i], x2)
 
 # NamedTuple
 @test StructTypes.construct((i, nm, T) -> (1, 3.14, "hey")[i], NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}) == (a=1, b=3.14, c="hey")
-  
+
 x3 = D(nothing, 3.14, "")
 @inline StructTypes.omitempties(::Type{D}) = true
 all_i = Int[]
@@ -437,6 +437,8 @@ end
 CNT = Ref(0)
 StructTypes.foreachfield((args...) -> CNT[] += 1, EmptyStruct)
 @test CNT[] == 0
+
+@test !StructTypes.applyfield((x...) -> 10, A, :y)
 
 @testset "StructTypes.constructfrom(T, ::Vector{Any})" begin
 
