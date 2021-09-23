@@ -563,21 +563,21 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
     end
 end
 
+struct MyStruct1
+    val::Int
+end
+StructTypes.@Struct MyStruct1
+StructTypes.@NullType struct MyStruct2
+    val::Int
+end
+
+StructTypes.@Mutable mutable struct MyStruct3
+    val::Int
+end
+
 @testset "Macros" begin
-    struct MyStruct1
-        val::Int
-    end
-    StructTypes.@Struct MyStruct1
     @test StructTypes.StructType(MyStruct1) isa StructTypes.Struct
-
-    StructTypes.@NullType struct MyStruct2
-        val::Int
-    end
     @test StructTypes.StructType(MyStruct2) isa StructTypes.NullType
-
-    StructTypes.@Mutable mutable struct MyStruct3
-        val::Int
-    end
     @test StructTypes.StructType(MyStruct3) isa StructTypes.Mutable
 
     # Test an expression that is not a struct def
