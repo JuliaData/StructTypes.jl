@@ -2,8 +2,6 @@ module StructTypes
 
 using UUIDs, Dates
 
-include("macros.jl")
-
 "Abstract super type of various `StructType`s; see `StructTypes.DataType`, `StructTypes.CustomType`, `StructTypes.InterfaceType`, and `StructTypes.AbstractType` for more specific kinds of `StructType`s"
 abstract type StructType end
 
@@ -1067,5 +1065,7 @@ function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
     TT = types[Symbol(StructType(S) == DictType() ? obj[skey] : getfield(obj, skey))]
     return constructfrom(TT, obj)
 end
+
+include("macros.jl")
 
 end # module

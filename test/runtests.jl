@@ -562,3 +562,32 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
         end
     end
 end
+
+@testset "Macros" begin
+    struct MyStruct1
+        val::Int
+    end
+    StructTypes.@Struct MyStruct1
+    @test StructTypes.StructType(MyStruct1) isa StructTypes.Struct
+
+    StructTypes.@NullType struct MyStruct2
+        val::Int
+    end
+    @test StructTypes.StructType(MyStruct2) isa StructTypes.NullType
+
+    StructTypes.@Mutable mutable struct MyStruct3
+        val::Int
+    end
+    @test StructTypes.StructType(MyStruct3) isa StructTypes.Mutable
+
+    # Test an expression that is not a struct def
+    expr = StructTypes.macro_constructor(Expr(:a), StructTypes.Struct)
+    @test_throws ArgumentError eval(expr)
+
+    # Test a symbol that is not a type
+    expr = StructTypes.macro_constructor(:var, StructTypes.Struct)
+    eval(quote
+        var = 1
+    end)
+    @test_throws ArgumentError eval(expr.args[1]) # Extract body from within escape
+end
