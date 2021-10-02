@@ -1066,4 +1066,6 @@ function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
     return constructfrom(TT, obj)
 end
 
+include("macros.jl")
+
 end # module
