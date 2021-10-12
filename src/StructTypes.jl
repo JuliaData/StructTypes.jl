@@ -417,10 +417,10 @@ end
 
 _symbol(ptr, len) = ccall(:jl_symbol_n, Ref{Symbol}, (Ptr{UInt8}, Int), ptr, len)
 
-construct(::Type{E}, ptr::Ptr{UInt8}, len::Int) where {E <: Enum} = construct(E, _symbol(ptr, len))
-construct(::Type{E}, str::String) where {E <: Enum} = construct(E, Symbol(str))
+construct(::Type{E}, ptr::Ptr{UInt8}, len::Int; kw...) where {E <: Enum} = construct(E, _symbol(ptr, len))
+construct(::Type{E}, str::String; kw...) where {E <: Enum} = construct(E, Symbol(str))
 
-function construct(::Type{E}, sym::Symbol) where {E <: Enum}
+function construct(::Type{E}, sym::Symbol; kw...) where {E <: Enum}
     @static if VERSION < v"1.2.0-DEV.272"
         Core.eval(parentmodule(E), sym)
     else
