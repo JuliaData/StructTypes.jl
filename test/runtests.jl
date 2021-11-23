@@ -23,6 +23,7 @@ end
 @test StructTypes.StructType(Any) == StructTypes.Struct()
 @test StructTypes.StructType(A) == StructTypes.NoStructType()
 @test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
+@test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonStructType()
 
 @test StructTypes.names(A) == ()
 @test StructTypes.names(A(1)) == ()
@@ -45,6 +46,7 @@ end
 @test StructTypes.isempty(nothing)
 @test !StructTypes.isempty(A(1))
 @test !StructTypes.isempty(A(1), 1)
+@test StructTypes.isempty(EmptyStruct)
 
 @test StructTypes.keywordargs(A) == NamedTuple()
 @test StructTypes.keywordargs(A(1)) == NamedTuple()
@@ -260,8 +262,6 @@ mutable struct DateStruct
 end
 DateStruct() = DateStruct(Date(0), DateTime(0), Time(0))
 Base.:(==)(a::DateStruct, b::DateStruct) = a.date == b.date && a.datetime == b.datetime && a.time == b.time
-
-struct EmptyStruct end
 
 @testset "convenience functions" begin
 
