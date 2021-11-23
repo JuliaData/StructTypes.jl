@@ -23,7 +23,7 @@ end
 @test StructTypes.StructType(Any) == StructTypes.Struct()
 @test StructTypes.StructType(A) == StructTypes.NoStructType()
 @test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
-@test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonStructType()
+@test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonType()
 
 @test StructTypes.names(A) == ()
 @test StructTypes.names(A(1)) == ()

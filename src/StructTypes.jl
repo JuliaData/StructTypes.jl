@@ -9,11 +9,11 @@ StructType(x::T) where {T} = StructType(T)
 
 "Default `StructTypes.StructType` for types that don't have a `StructType` defined; this ensures objects must have an explicit `StructType` to avoid unanticipated issues"
 struct NoStructType <: StructType end
-struct SingletonStructType <: StructType end
+struct SingletonType <: StructType end
 
 function StructType(::Type{T}) where {T}
     if Base.issingletontype(T)
-        SingletonStructType()
+        SingletonType()
     else
         NoStructType()
     end
