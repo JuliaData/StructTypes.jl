@@ -46,7 +46,7 @@ end
 @test StructTypes.isempty(nothing)
 @test !StructTypes.isempty(A(1))
 @test !StructTypes.isempty(A(1), 1)
-@test StructTypes.isempty(EmptyStruct)
+@test !StructTypes.isempty(EmptyStruct)
 
 @test StructTypes.keywordargs(A) == NamedTuple()
 @test StructTypes.keywordargs(A(1)) == NamedTuple()
