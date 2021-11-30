@@ -21,8 +21,8 @@ end
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
-@test StructTypes.StructType(A) == StructTypes.NoStructType()
-@test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
+@test StructTypes.StructType(A) == StructTypes.Struct()
+@test StructTypes.StructType(A(1)) == StructTypes.Struct()
 
 @test StructTypes.names(A) == ()
 @test StructTypes.names(A(1)) == ()

@@ -7,10 +7,8 @@ abstract type StructType end
 
 StructType(x::T) where {T} = StructType(T)
 
-"Default `StructTypes.StructType` for types that don't have a `StructType` defined; this ensures objects must have an explicit `StructType` to avoid unanticipated issues"
+"For types that don't have valid `StructType` representation"
 struct NoStructType <: StructType end
-
-StructType(::Type{T}) where {T} = NoStructType()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
@@ -102,6 +100,8 @@ StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 ```
 """
 abstract type Struct <: DataType end
+
+StructType(::Type{T}) where {T} = Struct()
 
 struct UnorderedStruct <: Struct end
 struct OrderedStruct <: Struct end
