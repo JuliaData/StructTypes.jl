@@ -19,18 +19,6 @@ end
 
 @testset "StructTypes" begin
 
-# Need to test all possible types.  See https://docs.julialang.org/en/v1/manual/types/
-
-# Abstract -> Not necessary, instances aren't abstract
-# Primitive -> Every primitive type is already handled, and new primitives inherit from that
-# Composite
-# Mutable Composite
-# Type Unions
-# Parametric types
-# UnionAll
-# Singleton
-# Value types
-
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
 @test StructTypes.StructType(A) == StructTypes.NoStructType()
@@ -156,6 +144,54 @@ StructTypes.foreachfield(OmitEmp(nothing)) do i, nm, T, val
     counter += 1
 end
 @test counter == 0
+end
+
+# Make sure all builtin types have struct types, except where we don't want them to
+@testset "Built in Julia types" begin
+
+    # Built in types that should be `NoStructType`
+    nostructtype_union = Union{
+        Core.Exception, 
+        Core.Expr, 
+        Core.Function,
+        Core.GlobalRef,
+        Core.IO,
+        Core.LineNumberNode,
+        Core.Method,
+        Core.Module,
+        Core.Number, # This is questionable
+        Core.QuoteNode,
+        Core.Task,
+        Core.Type{T} where T,
+        Core.TypeVar,
+        Core.WeakRef,
+        Base.AbstractCmd,
+        Base.AbstractLock,
+        Base.AbstractPattern, # One of the subtypes, Regex, might be representable as a string
+        Base.AbstractMatch,
+        Base.AbstractDisplay,
+        Base.Condition,
+        Base.ExponentialBackOff,
+        Base.IndexStyle,
+        Base.RawFD, # There might be a way to represent this
+        Base.Timer
+    }
+
+    # tuples containing (module, property)
+    core_properties = map(x -> (Core,x), propertynames(Core))
+    base_properties = map(x -> (Base,x), propertynames(Base))
+
+    for (m, n) in [core_properties; base_properties]
+        prop = getproperty(m,n)
+        if typeof(prop) == DataType
+            struct_type = StructTypes.StructType(prop)
+            cond = struct_type == StructTypes.NoStructType() && prop <: nostructtype_union || struct_type != StructTypes.NoStructType()
+            if !cond
+                @warn "Built in type $n is incorrectly parsed as $(StructTypes.StructType(prop))"
+            end
+            @test cond
+        end
+    end
 
 end
 
