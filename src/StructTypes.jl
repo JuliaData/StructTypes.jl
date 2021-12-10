@@ -11,14 +11,6 @@ StructType(x::T) where {T} = StructType(T)
 struct NoStructType <: StructType end
 struct SingletonType <: StructType end
 
-function StructType(::Type{T}) where {T}
-    if Base.issingletontype(T)
-        SingletonType()
-    else
-        NoStructType()
-    end
-end
-
 """
     StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
 
@@ -109,6 +101,16 @@ StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 ```
 """
 abstract type Struct <: DataType end
+
+
+function StructType(::Type{T}) where {T}
+    if Base.issingletontype(T)
+        SingletonType()
+    else
+        "Default `StructTypes.StructType` to a plain Struct()"
+        Struct()
+    end
+end
 
 struct UnorderedStruct <: Struct end
 struct OrderedStruct <: Struct end
