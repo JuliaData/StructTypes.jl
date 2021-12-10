@@ -19,6 +19,18 @@ end
 
 @testset "StructTypes" begin
 
+# Need to test all possible types.  See https://docs.julialang.org/en/v1/manual/types/
+
+# Abstract -> Not necessary, instances aren't abstract
+# Primitive -> Every primitive type is already handled, and new primitives inherit from that
+# Composite
+# Mutable Composite
+# Type Unions
+# Parametric types
+# UnionAll
+# Singleton
+# Value types
+
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
 @test StructTypes.StructType(A) == StructTypes.NoStructType()
