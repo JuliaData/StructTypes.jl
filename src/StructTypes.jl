@@ -107,8 +107,7 @@ function StructType(::Type{T}) where {T}
     if Base.issingletontype(T)
         SingletonType()
     else
-        "Default `StructTypes.StructType` to a plain Struct()"
-        Struct()
+        NoStructType()
     end
 end
 
@@ -120,6 +119,7 @@ Struct() = UnorderedStruct()
 StructType(u::Union) = Struct()
 StructType(::Type{Any}) = Struct()
 StructType(::Type{<:NamedTuple}) = Struct()
+StructType(::Type{DataType}) = Struct()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.Mutable()
@@ -415,6 +415,8 @@ StructType(::Type{<:AbstractChar}) = StringType()
 StructType(::Type{UUID}) = StringType()
 StructType(::Type{T}) where {T <: Dates.TimeType} = StringType()
 StructType(::Type{VersionNumber}) = StringType()
+StructType(::Type{Base.Cstring}) = StringType()
+StructType(::Type{Base.Cwstring}) = StringType()
 
 function construct(::Type{Char}, str::String; kw...)
     if length(str) == 1
@@ -467,6 +469,7 @@ Similarly for serializing, `Float64(x::T)` will first be called before serializi
 struct NumberType <: InterfaceType end
 
 StructType(::Type{<:Real}) = NumberType()
+StructType(::Type{<:Complex}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
 
