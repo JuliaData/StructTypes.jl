@@ -21,8 +21,8 @@ end
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
-@test StructTypes.StructType(A) == StructTypes.NoStructType()
-@test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
+@test StructTypes.StructType(A) == StructTypes.Struct()
+@test StructTypes.StructType(A(1)) == StructTypes.Struct()
 @test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonType()
 
 @test StructTypes.names(A) == ()
@@ -192,6 +192,49 @@ end
             @test cond
         end
     end
+
+end
+
+# Ensure all types a user can define have proper struct types
+@testset "User defined types" begin
+    # See https://docs.julialang.org/en/v1/manual/types/ for kinds of types
+
+    # Abstract Type
+    abstract type Abstract end
+    @test StructTypes.StructType(Abstract) == StructTypes.AbstractType()
+
+    # Primitive Type
+    primitive type Primitive <: Unsigned 8 end
+    @test StructTypes.StructType(Primitive) == StructTypes.NumberType()
+
+    # Composite Type
+    struct Composite
+        foo
+        bar
+    end
+    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct()
+
+    # Mutable Composite Type
+    mutable struct MutableComposite
+        foo
+        bar
+    end
+    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct()
+
+    # Type Unions
+    TypeUnion = Union{Composite, MutableComposite}
+    @test StructTypes.StructType(TypeUnion) == StructTypes.UnorderedStruct()
+
+    # Parametric Types
+    struct Parametric{T1, T2}
+        foo::T1
+        bar::T2
+    end
+    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct()
+
+    # Singleton Types
+    struct Singleton end
+    @test StructTypes.StructType(Singleton) == StructTypes.SingletonType()
 
 end
 

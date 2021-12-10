@@ -106,6 +106,10 @@ abstract type Struct <: DataType end
 function StructType(::Type{T}) where {T}
     if Base.issingletontype(T)
         SingletonType()
+    elseif Base.isabstracttype(T)
+        AbstractType()
+    elseif Base.isstructtype(T)
+        Struct()
     else
         NoStructType()
     end
