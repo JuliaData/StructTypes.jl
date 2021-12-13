@@ -17,12 +17,118 @@ struct OmitEmp
     x::Union{Nothing, Int}
 end
 
+# Built in types and what they should parse to
+# This should cover all subtypes TODO
+# Abstract types appear twice because they themselves are abstract but their subclasses are not
+builtin_type_mapping = Dict(
+    StructTypes.AbstractType() => Union{
+        Core.IO,
+        Core.Number, 
+        Base.AbstractDisplay,
+        Base.IndexStyle,
+        Base.VERSION <= v"1.2" ? Union{} : Union{
+            Base.AbstractMatch,
+            Base.AbstractPattern,
+        } 
+    },
+    StructTypes.UnorderedStruct() => Union{
+        Core.Any, # Seems to be too open
+    },
+    StructTypes.StringType() => Union{
+        Core.AbstractChar,
+        Core.AbstractString,
+        Core.Symbol,
+        Base.Cstring,
+        Base.Cwstring,
+        Base.Regex,
+        Base.VersionNumber,
+    },
+    StructTypes.NumberType() => Union{
+        Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
+    },
+    StructTypes.NoStructType() => Union{
+        Core.Exception,
+        Core.Expr,
+        Core.DataType,
+        Core.GlobalRef,
+        Core.IO,
+        Core.LineNumberNode,
+        Core.Method,
+        Core.Module,
+        Core.QuoteNode,
+        Core.Task,
+        Core.TypeVar,
+        Core.Union,
+        Core.UnionAll,
+        Core.WeakRef,
+        Base.AbstractCmd,
+        Base.AbstractDisplay,
+        Base.ExponentialBackOff,
+        Base.Function,
+        Base.RawFD,
+        Base.Timer,Base.VERSION <= v"1.2" ? Union{
+            Base.Condition,
+            Base.ReentrantLock,
+            Base.RegexMatch,
+        } : Union{
+            Base.AbstractLock,
+            Base.AbstractMatch,
+            Base.GenericCondition,
+        },
+    },
+    StructTypes.BoolType() => Union{
+        Core.Bool
+    },
+    StructTypes.NullType() => Union{
+        Core.Cvoid,
+        Base.Missing,
+    },
+    StructTypes.SingletonType() => Union{
+        Core.UndefInitializer,
+        Base.IndexStyle,
+    },
+    StructTypes.ArrayType() => Union{
+        Base.AbstractArray,
+        Base.AbstractSet,
+        Base.AbstractVector,
+        Core.Tuple,
+    }
+)
+
+# All kinds of types a user can define
+# Abstract Type
+abstract type Abstract end
+
+# Primitive Type
+primitive type Primitive <: Unsigned 8 end
+
+# Composite Type
+struct Composite
+    foo
+    bar
+end
+
+# Mutable Composite Type
+mutable struct MutableComposite
+    foo
+    bar
+end
+
+# Parametric Types
+struct Parametric{T1, T2}
+    foo::T1
+    bar::T2
+end
+
+# Singleton Types
+struct Singleton end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
-@test StructTypes.StructType(A) == StructTypes.Struct()
-@test StructTypes.StructType(A(1)) == StructTypes.Struct()
+@test StructTypes.StructType(A) == StructTypes.NoStructType()
+@test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
 @test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonType()
 
 @test StructTypes.names(A) == ()
@@ -149,34 +255,6 @@ end
 # Make sure all builtin types have struct types, except where we don't want them to
 @testset "Built in Julia types" begin
 
-    # Built in types that should be `NoStructType`
-    nostructtype_union = Union{
-        Core.Exception, 
-        Core.Expr, 
-        Core.Function,
-        Core.GlobalRef,
-        Core.IO,
-        Core.LineNumberNode,
-        Core.Method,
-        Core.Module,
-        Core.Number, # This is questionable
-        Core.QuoteNode,
-        Core.Task,
-        Core.Type{T} where T,
-        Core.TypeVar,
-        Core.WeakRef,
-        Base.AbstractCmd,
-        Base.AbstractLock,
-        Base.AbstractPattern, # One of the subtypes, Regex, might be representable as a string
-        Base.AbstractMatch,
-        Base.AbstractDisplay,
-        Base.Condition,
-        Base.ExponentialBackOff,
-        Base.IndexStyle,
-        Base.RawFD, # There might be a way to represent this
-        Base.Timer
-    }
-
     # tuples containing (module, property)
     core_properties = map(x -> (Core,x), propertynames(Core))
     base_properties = map(x -> (Base,x), propertynames(Base))
@@ -185,9 +263,9 @@ end
         prop = getproperty(m,n)
         if typeof(prop) == DataType
             struct_type = StructTypes.StructType(prop)
-            cond = struct_type == StructTypes.NoStructType() && prop <: nostructtype_union || struct_type != StructTypes.NoStructType()
+            cond = prop <: builtin_type_mapping[StructTypes.StructType(prop)]
             if !cond
-                @warn "Built in type $n is incorrectly parsed as $(StructTypes.StructType(prop))"
+                @warn "Built in type $m.$n is incorrectly parsed as $(StructTypes.StructType(prop))"
             end
             @test cond
         end
@@ -200,40 +278,25 @@ end
     # See https://docs.julialang.org/en/v1/manual/types/ for kinds of types
 
     # Abstract Type
-    abstract type Abstract end
     @test StructTypes.StructType(Abstract) == StructTypes.AbstractType()
 
     # Primitive Type
-    primitive type Primitive <: Unsigned 8 end
     @test StructTypes.StructType(Primitive) == StructTypes.NumberType()
 
     # Composite Type
-    struct Composite
-        foo
-        bar
-    end
-    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct()
+    @test StructTypes.StructType(Composite) == StructTypes.NoStructType() # TODO: Should this be UnorderedStruct?
 
     # Mutable Composite Type
-    mutable struct MutableComposite
-        foo
-        bar
-    end
-    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct()
+    @test StructTypes.StructType(MutableComposite) == StructTypes.NoStructType() # TODO: Should this be UnorderedStruct?
 
     # Type Unions
     TypeUnion = Union{Composite, MutableComposite}
     @test StructTypes.StructType(TypeUnion) == StructTypes.UnorderedStruct()
 
     # Parametric Types
-    struct Parametric{T1, T2}
-        foo::T1
-        bar::T2
-    end
-    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct()
+    @test StructTypes.StructType(Parametric) == StructTypes.NoStructType() # TODO: Should be UnorderedStruct?
 
     # Singleton Types
-    struct Singleton end
     @test StructTypes.StructType(Singleton) == StructTypes.SingletonType()
 
 end
