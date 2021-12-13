@@ -11,6 +11,9 @@ StructType(x::T) where {T} = StructType(T)
 struct NoStructType <: StructType end
 struct SingletonType <: StructType end
 
+StructType(::Type{T}) where {T<:Exception} = NoStructType()
+StructType(::Type{T}) where {T<:Function} = NoStructType()
+
 """
     StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
 
@@ -103,13 +106,14 @@ StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 abstract type Struct <: DataType end
 
 
+# Check for structs we can't use multiple dispatch for
 function StructType(::Type{T}) where {T}
-    if Base.issingletontype(T)
+    if T <: Core.Function
+        NoStructType()
+    elseif Base.issingletontype(T)
         SingletonType()
     elseif Base.isabstracttype(T)
         AbstractType()
-    elseif Base.isstructtype(T)
-        Struct()
     else
         NoStructType()
     end
@@ -421,6 +425,7 @@ StructType(::Type{T}) where {T <: Dates.TimeType} = StringType()
 StructType(::Type{VersionNumber}) = StringType()
 StructType(::Type{Base.Cstring}) = StringType()
 StructType(::Type{Base.Cwstring}) = StringType()
+StructType(::Type{Base.Regex}) = StringType()
 
 function construct(::Type{Char}, str::String; kw...)
     if length(str) == 1
