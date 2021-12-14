@@ -107,13 +107,7 @@ abstract type Struct <: DataType end
 
 
 # Check for structs we can't use multiple dispatch for
-function StructType(::Type{T}) where {T}
-    if Base.issingletontype(T)
-        SingletonType()
-    else
-        Struct()
-    end
-end
+StructType(::Type{T}) where {T} = Base.issingletontype(T) ? SingletonType() : Struct()
 
 struct UnorderedStruct <: Struct end
 struct OrderedStruct <: Struct end
