@@ -256,7 +256,7 @@ end
 @test counter == 0
 end
 
-# Make sure all builtin types have struct types, except where we don't want them to
+# Make sure all builtin types have struct types
 @testset "Built in Julia types" begin
 
     # tuples containing (module, property)
