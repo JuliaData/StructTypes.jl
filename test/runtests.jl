@@ -18,7 +18,7 @@ struct OmitEmp
 end
 
 # Built in types and what they should parse to
-# This should cover all subtypes TODO
+# This should cover all subtypes
 # Abstract types appear twice because they themselves are abstract but their subclasses are not
 builtin_type_mapping = Dict(
     StructTypes.AbstractType() => Union{
@@ -284,17 +284,17 @@ end
     @test StructTypes.StructType(Primitive) == StructTypes.NumberType()
 
     # Composite Type
-    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct() # TODO: Should this be UnorderedStruct?
+    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct()
 
     # Mutable Composite Type
-    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct() # TODO: Should this be UnorderedStruct?
+    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct()
 
     # Type Unions
     TypeUnion = Union{Composite, MutableComposite}
     @test StructTypes.StructType(TypeUnion) == StructTypes.UnorderedStruct()
 
     # Parametric Types
-    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct() # TODO: Should be UnorderedStruct?
+    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct()
 
     # Singleton Types
     @test StructTypes.StructType(Singleton) == StructTypes.SingletonType()
