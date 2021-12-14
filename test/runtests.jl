@@ -25,31 +25,16 @@ builtin_type_mapping = Dict(
         Core.IO,
         Core.Number, 
         Base.AbstractDisplay,
-        Base.IndexStyle,
         Base.VERSION <= v"1.2" ? Union{} : Union{
             Base.AbstractMatch,
             Base.AbstractPattern,
         } 
     },
     StructTypes.UnorderedStruct() => Union{
-        Core.Any, # Seems to be too open
-    },
-    StructTypes.StringType() => Union{
-        Core.AbstractChar,
-        Core.AbstractString,
-        Core.Symbol,
-        Base.Cstring,
-        Base.Cwstring,
-        Base.Regex,
-        Base.VersionNumber,
-    },
-    StructTypes.NumberType() => Union{
-        Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
-    },
-    StructTypes.NoStructType() => Union{
+        Core.Any, # Might be too open
+        Core.DataType,
         Core.Exception,
         Core.Expr,
-        Core.DataType,
         Core.GlobalRef,
         Core.IO,
         Core.LineNumberNode,
@@ -65,16 +50,34 @@ builtin_type_mapping = Dict(
         Base.AbstractDisplay,
         Base.ExponentialBackOff,
         Base.Function,
+        Base.IndexStyle,
         Base.RawFD,
-        Base.Timer,Base.VERSION <= v"1.2" ? Union{
+        Base.Timer,
+        Base.VERSION <= v"1.2" ? Union{
             Base.Condition,
             Base.ReentrantLock,
             Base.RegexMatch,
         } : Union{
             Base.AbstractLock,
             Base.AbstractMatch,
+            Base.AbstractPattern,
             Base.GenericCondition,
         },
+    },
+    StructTypes.StringType() => Union{
+        Core.AbstractChar,
+        Core.AbstractString,
+        Core.Symbol,
+        Base.Cstring,
+        Base.Cwstring,
+        Base.Regex,
+        Base.VersionNumber,
+    },
+    StructTypes.NumberType() => Union{
+        Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
+    },
+    StructTypes.NoStructType() => Union{
+        Core.Function,
     },
     StructTypes.BoolType() => Union{
         Core.Bool
@@ -84,6 +87,7 @@ builtin_type_mapping = Dict(
         Base.Missing,
     },
     StructTypes.SingletonType() => Union{
+        Core.Exception,
         Core.UndefInitializer,
         Base.IndexStyle,
     },
@@ -278,7 +282,7 @@ end
     # See https://docs.julialang.org/en/v1/manual/types/ for kinds of types
 
     # Abstract Type
-    @test StructTypes.StructType(Abstract) == StructTypes.AbstractType()
+    @test StructTypes.StructType(Abstract) == StructTypes.UnorderedStruct()
 
     # Primitive Type
     @test StructTypes.StructType(Primitive) == StructTypes.NumberType()

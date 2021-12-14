@@ -11,8 +11,8 @@ StructType(x::T) where {T} = StructType(T)
 struct NoStructType <: StructType end
 struct SingletonType <: StructType end
 
-StructType(::Type{T}) where {T<:Exception} = NoStructType()
-StructType(::Type{T}) where {T<:Function} = NoStructType()
+StructType(::Type{<:Function}) = NoStructType()
+
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
@@ -108,12 +108,8 @@ abstract type Struct <: DataType end
 
 # Check for structs we can't use multiple dispatch for
 function StructType(::Type{T}) where {T}
-    if T <: Core.Function
-        NoStructType()
-    elseif Base.issingletontype(T)
+    if Base.issingletontype(T)
         SingletonType()
-    elseif Base.isabstracttype(T)
-        AbstractType()
     else
         Struct()
     end
@@ -476,8 +472,7 @@ Similarly for serializing, `Float64(x::T)` will first be called before serializi
 """
 struct NumberType <: InterfaceType end
 
-StructType(::Type{<:Real}) = NumberType()
-StructType(::Type{<:Complex}) = NumberType()
+StructType(::Type{<:Number}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
 
