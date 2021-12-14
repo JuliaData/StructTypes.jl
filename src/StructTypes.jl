@@ -115,7 +115,7 @@ function StructType(::Type{T}) where {T}
     elseif Base.isabstracttype(T)
         AbstractType()
     else
-        NoStructType()
+        Struct()
     end
 end
 
@@ -127,7 +127,6 @@ Struct() = UnorderedStruct()
 StructType(u::Union) = Struct()
 StructType(::Type{Any}) = Struct()
 StructType(::Type{<:NamedTuple}) = Struct()
-StructType(::Type{DataType}) = Struct()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.Mutable()

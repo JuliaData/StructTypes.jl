@@ -127,8 +127,8 @@ struct Singleton end
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
-@test StructTypes.StructType(A) == StructTypes.NoStructType()
-@test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
+@test StructTypes.StructType(A) == StructTypes.UnorderedStruct()
+@test StructTypes.StructType(A(1)) == StructTypes.UnorderedStruct()
 @test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonType()
 
 @test StructTypes.names(A) == ()
@@ -284,17 +284,17 @@ end
     @test StructTypes.StructType(Primitive) == StructTypes.NumberType()
 
     # Composite Type
-    @test StructTypes.StructType(Composite) == StructTypes.NoStructType() # TODO: Should this be UnorderedStruct?
+    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct() # TODO: Should this be UnorderedStruct?
 
     # Mutable Composite Type
-    @test StructTypes.StructType(MutableComposite) == StructTypes.NoStructType() # TODO: Should this be UnorderedStruct?
+    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct() # TODO: Should this be UnorderedStruct?
 
     # Type Unions
     TypeUnion = Union{Composite, MutableComposite}
     @test StructTypes.StructType(TypeUnion) == StructTypes.UnorderedStruct()
 
     # Parametric Types
-    @test StructTypes.StructType(Parametric) == StructTypes.NoStructType() # TODO: Should be UnorderedStruct?
+    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct() # TODO: Should be UnorderedStruct?
 
     # Singleton Types
     @test StructTypes.StructType(Singleton) == StructTypes.SingletonType()
