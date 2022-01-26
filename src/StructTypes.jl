@@ -279,9 +279,9 @@ getPerson(id::Int) = Strapping.construct(Person, DBInterface.execute(db,
         WHERE person.id = \$id
     \"\"\"))
 ```
-This works because the column names in the resultset of this query are "id, name, spouse_id, spouse_name";
+This works because the column names in the resultset of this query are "id, name, spouse\\_id, spouse\\_name";
 because we defined `StructTypes.fieldprefix` for `Person`, Strapping.jl knows that each
-column starting with "spouse_" should be used in constructing the `Spouse` field of `Person`.
+column starting with "spouse\\_" should be used in constructing the `Spouse` field of `Person`.
 """
 function fieldprefix end
 
@@ -359,7 +359,7 @@ So if your type already subtypes these and satifies their interface, things shou
 Otherwise, the interface to satisfy `StructTypes.ArrayType()` for deserializing is:
 
   * `T(x::Vector)`: implement a constructor that takes a `Vector` argument of values and constructs a `T`
-  * `StructTypes.construct(::Type{T}, x::Vecto; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor isn't possible
+  * `StructTypes.construct(::Type{T}, x::Vector; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor isn't possible
   * Optional: `Base.IteratorEltype(::Type{T}) = Base.HasEltype()` and `Base.eltype(x::T)`: this can be used to signal that elements for your type are expected to be a homogenous type
 
 The interface to satisfy for serializing is:
