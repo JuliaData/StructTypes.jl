@@ -569,7 +569,7 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
                                         @NamedTuple{b::Union{Int, Nothing}}((nothing,))),
             (@NamedTuple{b::Union{Int, Nothing}, c::Int},   (;a = 1, c = 3),
                                         @NamedTuple{b::Union{Int, Nothing}, c::Int}((nothing, 3))),
-            (@NamedTuple{b::Union{Int, Nothing}, c::Int},   (;a = 1, b=2, c = 3),
+            (@NamedTuple{b::Union{Int, Nothing}, c::Int},   (;a = 1, b = 2, c = 3),
                                         @NamedTuple{b::Union{Int, Nothing}, c::Int}((2, 3))),
         ]
         for (given_type, given_data, expected_data) in cases
