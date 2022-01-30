@@ -1066,6 +1066,49 @@ function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
     return constructfrom(TT, obj)
 end
 
+StructType(::Type{T}) where {T <: NamedTuple} = UnorderedStruct()
+
+constructfrom(t::Type{NamedTuple}, obj::NamedTuple) =
+    constructfrom(StructType(t), t, StructType(typeof(obj)), obj)
+
+constructfrom(::Union{Struct, UnorderedStruct}, t::Type{T}, ::Union{Struct, UnorderedStruct}, obj::NamedTuple) where {T <: NamedTuple} =
+     construct_nt(t, obj)
+
+construct_nt(::Type{NamedTuple}, obj) = obj
+
+function construct_nt(t::Type{T}, obj) where {T <: NamedTuple}
+    keys = fieldnames(t)
+    keyset = Set(keys)
+    result = Dict()
+    for (key, value) in pairs(obj)
+        field = construct(Symbol, key)
+        if field in keyset
+            result[field] = constructfrom(fieldtype(t, field), value)
+            delete!(keyset, field)
+        else
+            msg = "Extraneous field $field in $obj, not in type $t"
+            try
+                throw(ArgumentError(msg))
+            catch err
+                @debug msg exception=err,catch_backtrace()
+            end
+        end
+    end
+    for key in keyset
+        type = fieldtype(t, key)
+        if nothing isa type
+            result[key] = nothing
+        elseif missing isa type
+            result[key] = missing
+        else
+            continue
+        end
+        delete!(keyset, key)
+    end
+    length(keyset) > 0 && throw(ArgumentError("Missing required fields $(join(keyset, ",")) from $obj in type $t"))
+    t(result[key] for key in keys)
+end
+
 include("macros.jl")
 
 end # module

@@ -561,6 +561,21 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
             @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, x) == (a=1, b=2.0, c="three")
         end
     end
+    @testset "named tuples" begin
+        cases = [
+            (NamedTuple,                                    (;a=1), (;a=1)),
+            (@NamedTuple{a::Int},                           (;a=1), (;a=1)),
+            (@NamedTuple{b::Union{Int, Nothing}},           (;a=1),
+                                        @NamedTuple{b::Union{Int, Nothing}}((nothing,))),
+            (@NamedTuple{b::Union{Int, Nothing}, c::Int},   (;a = 1, c = 3),
+                                        @NamedTuple{b::Union{Int, Nothing}, c::Int}((nothing, 3))),
+        ]
+        for (given_type, given_data, expected_data) in cases
+            data = StructTypes.constructfrom(given_type, given_data)
+            @test typeof(data) == typeof(expected_data)
+            @test data == expected_data
+        end
+    end
 end
 
 struct MyStruct1
