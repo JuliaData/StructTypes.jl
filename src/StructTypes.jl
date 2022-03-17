@@ -110,7 +110,6 @@ Struct() = UnorderedStruct()
 
 StructType(u::Union) = Struct()
 StructType(::Type{Any}) = Struct()
-StructType(::Type{<:NamedTuple}) = Struct()
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.Mutable()
