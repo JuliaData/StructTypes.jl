@@ -885,7 +885,7 @@ end
     StructTypes.constructfrom(T, obj)
     StructTypes.constructfrom!(x::T, obj)
 
-Construct an object of type `T` (`StructTypes.construtfrom`) or populate an existing
+Construct an object of type `T` (`StructTypes.constructfrom`) or populate an existing
 object of type `T` (`StructTypes.constructfrom!`) from another object `obj`. Utilizes
 and respects StructTypes.jl package properties, querying the `StructType` of `T`
 and respecting various serialization/deserialization names, keyword args, etc.
@@ -909,6 +909,8 @@ constructfrom!(x::T, obj) where {T} =
     constructfrom!(StructType(T), x, obj)
 
 function constructfrom(::Struct, U::Union, obj)
+    !(U.a isa Union) && obj isa U.a && return obj
+    !(U.b isa Union) && obj isa U.b && return obj
     try
         return constructfrom(StructType(U.a), U.a, obj)
     catch e
@@ -923,6 +925,12 @@ constructfrom(::Union{StringType, BoolType, NullType}, ::Type{T}, obj) where {T}
 
 constructfrom(::NumberType, ::Type{T}, obj) where {T} =
     construct(T, numbertype(T)(obj))
+
+constructfrom(::NumberType, ::Type{T}, obj::Symbol) where {T} =
+    constructfrom(NumberType(), T, string(obj))
+
+constructfrom(::NumberType, ::Type{T}, obj::String) where {T} =
+    construct(T, tryparse(T, obj))
 
 constructfrom(::ArrayType, ::Type{T}, obj) where {T} =
     constructfrom(ArrayType(), T, Base.IteratorEltype(T) == Base.HasEltype() ? eltype(T) : Any, obj)
