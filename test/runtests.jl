@@ -591,3 +591,14 @@ end
     end)
     @test_throws ArgumentError eval(expr.args[1]) # Extract body from within escape
 end
+
+struct Defaultable
+    a::String
+    b::String
+end
+StructTypes.StructType(::Type{Defaultable}) = StructTypes.Struct()
+StructTypes.defaults(::Type{Defaultable}) = (b="b",)
+@testset "Defaultable" begin
+    @test StructTypes.constructfrom(Defaultable, Dict(:a=>"a")) == Defaultable("a", "b")
+    @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
+end
