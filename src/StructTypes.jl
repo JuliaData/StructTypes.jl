@@ -862,6 +862,9 @@ mappings will be applied, and the function will be passed the Julia field name.
             end
         end
     )
+    if !f_applied && haskey(defaults(T), nm)
+        setfield!(x, nm, defaults(T)[nm])
+    end
     return f_applied
 end
 
@@ -1014,6 +1017,10 @@ constructfrom!(::Mutable, x::T, obj::S) where {T, S} =
     constructfrom!(Mutable(), x::T, StructType(S), obj)
 
 function constructfrom!(::Mutable, x::T, ::DictType, obj) where {T}
+    if !isempty(defaults(T))
+        # must be in this order to allow overriding of defaults
+        obj = merge(defaults(T), obj)
+    end
     for (k, v) in keyvaluepairs(obj)
         applyfield!(Closure(v), x, k)
     end
