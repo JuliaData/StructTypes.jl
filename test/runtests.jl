@@ -499,6 +499,7 @@ mutable struct C2
 end
 
 StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
+StructTypes.defaults(::Type{C2}) = (b=2.5,)
 
 @testset "makeobj" begin
     @testset "makeobj" begin
@@ -560,6 +561,14 @@ StructTypes.StructType(::Type{C2}) = StructTypes.Mutable()
             @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, input) == (a=1, b=2.0, c="three")
             @test StructTypes.constructfrom(NamedTuple{(:a, :b, :c), Tuple{Int64, Float64, String}}, x) == (a=1, b=2.0, c="three")
         end
+        @testset "constructfrom with defaults" begin
+            input = Dict(:a => 1, :c => "three")
+            output = StructTypes.constructfrom(C2, input)
+            @test typeof(output) === C2
+            @test output.a == 1
+            @test output.b == 2.5
+            @test output.c == "three"
+        end
     end
 end
 
@@ -590,4 +599,15 @@ end
         var = 1
     end)
     @test_throws ArgumentError eval(expr.args[1]) # Extract body from within escape
+end
+
+struct Defaultable
+    a::String
+    b::String
+end
+StructTypes.StructType(::Type{Defaultable}) = StructTypes.Struct()
+StructTypes.defaults(::Type{Defaultable}) = (b="b",)
+@testset "Defaultable" begin
+    @test StructTypes.constructfrom(Defaultable, Dict(:a=>"a")) == Defaultable("a", "b")
+    @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
 end
