@@ -878,6 +878,8 @@ end
     Base.@nexprs 32 i -> begin
         if isassigned(values, i)
             x_i = values[i]::fieldtype(T, i)
+        elseif !isempty(defaults(T))
+            x_i = get(defaults(T), fieldname(T, i), nothing)
         else
             x_i = nothing
         end
