@@ -320,6 +320,7 @@ The default definition is `StructTypes.construct(T, args...; kw...) = T(args...;
 """
 construct(T, args...; kw...) = T(args...; kw...)
 construct(::Type{T}, x::T; kw...) where {T} = x
+construct(::Type{T}, arg::String; kw...) where {T<:Number} = tryparse(T, arg)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.DictType()
