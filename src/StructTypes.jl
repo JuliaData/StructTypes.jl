@@ -571,6 +571,19 @@ subtypekey(::Type{T}) where {T} = :type
 subtypes(x::T) where {T} = subtypes(T)
 subtypes(::Type{T}) where {T} = NamedTuple()
 
+struct SubTypeClosure
+    _subtypes::Dict{Symbol, Type}
+    f::Function
+    SubTypeClosure(f::Function) = new(Dict{Symbol, Type}(), f)
+end
+Base.haskey(s::SubTypeClosure, k::Symbol) = haskey(s._subtypes, k)
+Base.get(s::SubTypeClosure, k::Symbol, default)  = get(s._subtypes, k, s.f(k))
+Base.getindex(s::SubTypeClosure, k::Symbol) = get!(s, k, s.f(k))
+Base.get!(s::SubTypeClosure, k::Symbol, default) = get!(s._subtypes, k, s.f(k))
+Base.length(s::SubTypeClosure) = length(s._subtypes)
+Base.keys(s::SubTypeClosure) = keys(s._subtypes)
+Base.values(s::SubTypeClosure) = values(s._subtypes)
+
 # helper functions for type-stable reflection while operating on struct fields
 
 """
@@ -1089,7 +1102,7 @@ constructfrom(::ArrayType, ::Type{T}, obj) where {T <: Tuple} =
 
 function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
     types = subtypes(T)
-    if length(types) == 1
+    if length(types) == 1 && !(types isa SubTypeClosure)
         return constructfrom(types[1], obj)
     end
     skey = subtypekey(T)

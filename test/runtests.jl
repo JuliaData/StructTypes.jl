@@ -490,6 +490,33 @@ StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
 StructTypes.StructType(::Type{Car}) = StructTypes.Struct()
 StructTypes.StructType(::Type{Truck}) = StructTypes.Struct()
 
+abstract type Bicycle end
+StructTypes.StructType(::Type{Bicycle}) = StructTypes.AbstractType()
+
+struct Road <: Bicycle
+    type::Tuple{String, Int, Int}
+    make::String
+    model::String
+    year::Int
+end
+StructTypes.StructType(::Type{Road}) = StructTypes.Struct()
+
+struct Gravel <: Bicycle
+    type::Tuple{String, Int, Int}
+    make::String
+    model::String
+end
+StructTypes.StructType(::Type{Gravel}) = StructTypes.Struct()
+
+function bicycle_subtypes(t_sym::Symbol)
+    t = eval(Meta.parse(String(t_sym)))
+    t[1] == "Road" && return Road
+    t[1] == "Gravel" && return Gravel
+    isempty(t[1]) && t[2] == 1 && return Gravel # gravel bikes often have 1 x N chainring/cog setups
+end
+sub_type_closure = StructTypes.SubTypeClosure(bicycle_subtypes)
+StructTypes.subtypes(::Type{Bicycle}) = sub_type_closure 
+
 mutable struct C2
     a::Int
     b::Float64
@@ -534,6 +561,20 @@ StructTypes.defaults(::Type{C2}) = (b=2.5,)
             @test typeof(StructTypes.constructfrom(a, c)) == b
             @test StructTypes.constructfrom(a, c) == c
         end
+    end
+    @testset "constructfrom with subtypeclosure" begin
+        dict = Dict(:type => ("Road", 2, 10), :make => "Spesh", :model => "Roubaix", :year=>2020)
+        bike = StructTypes.constructfrom(Bicycle, dict)
+        @test typeof(bike) == Road
+        @test bike.make == "Spesh"
+        dict = Dict(:type => ("Gravel", 1, 10), :make => "Canyon", :model => "Grail")
+        bike = StructTypes.constructfrom(Bicycle, dict)
+        @test typeof(bike) == Gravel
+        @test bike.make == "Canyon"
+        dict = Dict(:type => ("", 1, 10), :make => "Canyon", :model => "Grail")
+        bike = StructTypes.constructfrom(Bicycle, dict)
+        @test typeof(bike) == Gravel
+        @test bike.make == "Canyon"
     end
     @testset "mutable structs" begin
         @testset "constructfrom" begin
