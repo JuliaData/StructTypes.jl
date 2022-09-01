@@ -575,6 +575,11 @@ StructTypes.defaults(::Type{C2}) = (b=2.5,)
         bike = StructTypes.constructfrom(Bicycle, dict)
         @test typeof(bike) == Gravel
         @test bike.make == "Canyon"
+        @test Road   ∈ values(StructTypes.subtypes(Bicycle))
+        @test Gravel ∈ values(StructTypes.subtypes(Bicycle))
+        for k in keys(StructTypes.subtypes(Bicycle))
+            @test get(StructTypes.subtypes(Bicycle), k, nothing) == StructTypes.subtypes(Bicycle)[k]
+        end
     end
     @testset "mutable structs" begin
         @testset "constructfrom" begin

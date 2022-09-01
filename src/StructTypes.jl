@@ -580,7 +580,7 @@ Base.haskey(s::SubTypeClosure, k::Symbol) = haskey(s._subtypes, k)
 Base.get(s::SubTypeClosure, k::Symbol, default)  = get(s._subtypes, k, s.f(k))
 Base.getindex(s::SubTypeClosure, k::Symbol) = get!(s, k, s.f(k))
 Base.get!(s::SubTypeClosure, k::Symbol, default) = get!(s._subtypes, k, s.f(k))
-Base.length(s::SubTypeClosure) = length(s._subtypes)
+Base.length(s::SubTypeClosure) = typemax(Int) 
 Base.keys(s::SubTypeClosure) = keys(s._subtypes)
 Base.values(s::SubTypeClosure) = values(s._subtypes)
 
@@ -1102,7 +1102,7 @@ constructfrom(::ArrayType, ::Type{T}, obj) where {T <: Tuple} =
 
 function constructfrom(::AbstractType, ::Type{T}, obj::S) where {T, S}
     types = subtypes(T)
-    if length(types) == 1 && !(types isa SubTypeClosure)
+    if length(types) == 1
         return constructfrom(types[1], obj)
     end
     skey = subtypekey(T)
