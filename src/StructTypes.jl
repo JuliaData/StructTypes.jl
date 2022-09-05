@@ -581,6 +581,21 @@ subtypekey(::Type{T}) where {T} = :type
 subtypes(x::T) where {T} = subtypes(T)
 subtypes(::Type{T}) where {T} = NamedTuple()
 
+struct SubTypeClosure
+    _subtypes::Dict{Symbol, Type}
+    f::Function
+    SubTypeClosure(f::Function) = new(Dict{Symbol, Type}(), f)
+end
+Base.haskey(s::SubTypeClosure, k::Symbol) = haskey(s._subtypes, k)
+Base.get(s::SubTypeClosure, k::Symbol, default)  = get(s._subtypes, k, s.f(k))
+Base.getindex(s::SubTypeClosure, k::Symbol) = get!(s, k, s.f(k))
+Base.get!(s::SubTypeClosure, k::Symbol, default) = get!(s._subtypes, k, s.f(k))
+# we hard-code length here because we still want to fulfill AbstractDict interface
+# but our closure approach is "lazy" in that we don't know subtypes until they're encountered
+Base.length(s::SubTypeClosure) = typemax(Int) 
+Base.keys(s::SubTypeClosure) = keys(s._subtypes)
+Base.values(s::SubTypeClosure) = values(s._subtypes)
+
 # helper functions for type-stable reflection while operating on struct fields
 
 """
