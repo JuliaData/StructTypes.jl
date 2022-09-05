@@ -217,6 +217,17 @@ isempty(::Type{T}, x) where {T} = isempty(x) # generic fallback
 isempty(::Type{T}, x, i) where {T} = isempty(T, Core.getfield(x, i)) # generic fallback
 
 """
+    StructTypes.defaults(::Type{MyType}) = (:field_a=default_value, :field_b=>default_value)
+
+Define default arguments for various fields of `MyType`, which will be used to initialize the name-value
+dictionary used in `StructTypes.construct`.
+"""
+function defaults end
+
+defaults(x::T) where {T} = defaults(T)
+defaults(::Type{T}) where {T} = NamedTuple()
+
+"""
     StructTypes.keywordargs(::Type{MyType}) = (field1=(dateformat=dateformat"mm/dd/yyyy",), field2=(dateformat=dateformat"HH MM SS",))
 
 Specify for a `StructTypes.Mutable` the keyword arguments by field, given as a `NamedTuple` of `NamedTuple`s, that should be passed
@@ -285,9 +296,9 @@ getPerson(id::Int) = Strapping.construct(Person, DBInterface.execute(db,
         WHERE person.id = \$id
     \"\"\"))
 ```
-This works because the column names in the resultset of this query are "id, name, spouse_id, spouse_name";
+This works because the column names in the resultset of this query are "id, name, spouse\\_id, spouse\\_name";
 because we defined `StructTypes.fieldprefix` for `Person`, Strapping.jl knows that each
-column starting with "spouse_" should be used in constructing the `Spouse` field of `Person`.
+column starting with "spouse\\_" should be used in constructing the `Spouse` field of `Person`.
 """
 function fieldprefix end
 
@@ -315,6 +326,7 @@ The default definition is `StructTypes.construct(T, args...; kw...) = T(args...;
 """
 construct(T, args...; kw...) = T(args...; kw...)
 construct(::Type{T}, x::T; kw...) where {T} = x
+construct(::Type{T}, arg::String; kw...) where {T<:Number} = tryparse(T, arg)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.DictType()
@@ -365,7 +377,7 @@ So if your type already subtypes these and satifies their interface, things shou
 Otherwise, the interface to satisfy `StructTypes.ArrayType()` for deserializing is:
 
   * `T(x::Vector)`: implement a constructor that takes a `Vector` argument of values and constructs a `T`
-  * `StructTypes.construct(::Type{T}, x::Vecto; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor isn't possible
+  * `StructTypes.construct(::Type{T}, x::Vector; kw...)`: alternatively, you may overload the `StructTypes.construct` method for your type if defining a constructor isn't possible
   * Optional: `Base.IteratorEltype(::Type{T}) = Base.HasEltype()` and `Base.eltype(x::T)`: this can be used to signal that elements for your type are expected to be a homogenous type
 
 The interface to satisfy for serializing is:
@@ -860,6 +872,9 @@ mappings will be applied, and the function will be passed the Julia field name.
             end
         end
     )
+    if !f_applied && haskey(defaults(T), nm)
+        setfield!(x, nm, defaults(T)[nm])
+    end
     return f_applied
 end
 
@@ -873,6 +888,8 @@ end
     Base.@nexprs 32 i -> begin
         if isassigned(values, i)
             x_i = values[i]::fieldtype(T, i)
+        elseif !isempty(defaults(T))
+            x_i = get(defaults(T), fieldname(T, i), nothing)
         else
             x_i = nothing
         end
@@ -894,7 +911,7 @@ end
     StructTypes.constructfrom(T, obj)
     StructTypes.constructfrom!(x::T, obj)
 
-Construct an object of type `T` (`StructTypes.construtfrom`) or populate an existing
+Construct an object of type `T` (`StructTypes.constructfrom`) or populate an existing
 object of type `T` (`StructTypes.constructfrom!`) from another object `obj`. Utilizes
 and respects StructTypes.jl package properties, querying the `StructType` of `T`
 and respecting various serialization/deserialization names, keyword args, etc.
@@ -918,6 +935,8 @@ constructfrom!(x::T, obj) where {T} =
     constructfrom!(StructType(T), x, obj)
 
 function constructfrom(::Struct, U::Union, obj)
+    !(U.a isa Union) && obj isa U.a && return obj
+    !(U.b isa Union) && obj isa U.b && return obj
     try
         return constructfrom(StructType(U.a), U.a, obj)
     catch e
@@ -932,6 +951,12 @@ constructfrom(::Union{StringType, BoolType, NullType}, ::Type{T}, obj) where {T}
 
 constructfrom(::NumberType, ::Type{T}, obj) where {T} =
     construct(T, numbertype(T)(obj))
+
+constructfrom(::NumberType, ::Type{T}, obj::Symbol) where {T} =
+    constructfrom(NumberType(), T, string(obj))
+
+constructfrom(::NumberType, ::Type{T}, obj::String) where {T} =
+    construct(T, tryparse(T, obj))
 
 constructfrom(::ArrayType, ::Type{T}, obj) where {T} =
     constructfrom(ArrayType(), T, Base.IteratorEltype(T) == Base.HasEltype() ? eltype(T) : Any, obj)
@@ -1004,6 +1029,10 @@ constructfrom!(::Mutable, x::T, obj::S) where {T, S} =
     constructfrom!(Mutable(), x::T, StructType(S), obj)
 
 function constructfrom!(::Mutable, x::T, ::DictType, obj) where {T}
+    if !isempty(defaults(T))
+        # must be in this order to allow overriding of defaults
+        obj = merge(defaults(T), obj)
+    end
     for (k, v) in keyvaluepairs(obj)
         applyfield!(Closure(v), x, k)
     end
@@ -1038,8 +1067,11 @@ end
     return nothing
 end
 
-constructfrom(::Struct, ::Type{T}, ::DictType, obj) where {T} =
-    construct(DictClosure(obj), T)
+function constructfrom(::Struct, ::Type{T}, ::DictType, obj) where {T}
+    isempty(defaults(T)) && return construct(DictClosure(obj), T)
+    # populate a new obj with defined defaults
+    return construct(DictClosure(merge(defaults(T), obj)), T)
+end
 
 struct StructClosure{T}
     obj::T
