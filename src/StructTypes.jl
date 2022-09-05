@@ -9,8 +9,10 @@ StructType(x::T) where {T} = StructType(T)
 
 "Default `StructTypes.StructType` for types that don't have a `StructType` defined; this ensures objects must have an explicit `StructType` to avoid unanticipated issues"
 struct NoStructType <: StructType end
+struct SingletonType <: StructType end
 
-StructType(::Type{T}) where {T} = NoStructType()
+StructType(::Type{<:Function}) = NoStructType()
+
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.CustomStruct()
@@ -102,6 +104,10 @@ StructTypes.StructType(::Type{CoolType}) = StructTypes.Struct()
 ```
 """
 abstract type Struct <: DataType end
+
+
+# Check for structs we can't use multiple dispatch for
+StructType(::Type{T}) where {T} = Base.issingletontype(T) ? SingletonType() : Struct()
 
 struct UnorderedStruct <: Struct end
 struct OrderedStruct <: Struct end
@@ -418,6 +424,9 @@ StructType(::Type{<:AbstractChar}) = StringType()
 StructType(::Type{UUID}) = StringType()
 StructType(::Type{T}) where {T <: Dates.TimeType} = StringType()
 StructType(::Type{VersionNumber}) = StringType()
+StructType(::Type{Base.Cstring}) = StringType()
+StructType(::Type{Base.Cwstring}) = StringType()
+StructType(::Type{Base.Regex}) = StringType()
 
 function construct(::Type{Char}, str::String; kw...)
     if length(str) == 1
@@ -469,7 +478,7 @@ Similarly for serializing, `Float64(x::T)` will first be called before serializi
 """
 struct NumberType <: InterfaceType end
 
-StructType(::Type{<:Real}) = NumberType()
+StructType(::Type{<:Number}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
 

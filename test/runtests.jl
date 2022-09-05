@@ -17,12 +17,123 @@ struct OmitEmp
     x::Union{Nothing, Int}
 end
 
+# Built in types and what they should parse to
+# This should cover all subtypes
+# Abstract types appear twice because they themselves are abstract but their subclasses are not
+builtin_type_mapping = Dict(
+    StructTypes.AbstractType() => Union{
+        Core.IO,
+        Core.Number, 
+        Base.AbstractDisplay,
+        Base.VERSION <= v"1.2" ? Union{} : Union{
+            Base.AbstractMatch,
+            Base.AbstractPattern,
+        } 
+    },
+    StructTypes.UnorderedStruct() => Union{
+        Core.Any, # Might be too open
+        Core.DataType,
+        Core.Exception,
+        Core.Expr,
+        Core.GlobalRef,
+        Core.IO,
+        Core.LineNumberNode,
+        Core.Method,
+        Core.Module,
+        Core.QuoteNode,
+        Core.Task,
+        Core.TypeVar,
+        Core.Union,
+        Core.UnionAll,
+        Core.WeakRef,
+        Base.AbstractCmd,
+        Base.AbstractDisplay,
+        Base.ExponentialBackOff,
+        Base.Function,
+        Base.IndexStyle,
+        Base.RawFD,
+        Base.Timer,
+        Base.VERSION <= v"1.2" ? Union{
+            Base.Condition,
+            Base.ReentrantLock,
+            Base.RegexMatch,
+        } : Union{
+            Base.AbstractLock,
+            Base.AbstractMatch,
+            Base.AbstractPattern,
+            Base.GenericCondition,
+        },
+    },
+    StructTypes.StringType() => Union{
+        Core.AbstractChar,
+        Core.AbstractString,
+        Core.Symbol,
+        Base.Cstring,
+        Base.Cwstring,
+        Base.Regex,
+        Base.VersionNumber,
+    },
+    StructTypes.NumberType() => Union{
+        Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
+    },
+    StructTypes.NoStructType() => Union{
+        Core.Function,
+    },
+    StructTypes.BoolType() => Union{
+        Core.Bool
+    },
+    StructTypes.NullType() => Union{
+        Core.Cvoid,
+        Base.Missing,
+    },
+    StructTypes.SingletonType() => Union{
+        Core.Exception,
+        Core.UndefInitializer,
+        Base.IndexStyle,
+    },
+    StructTypes.ArrayType() => Union{
+        Base.AbstractArray,
+        Base.AbstractSet,
+        Base.AbstractVector,
+        Core.Tuple,
+    }
+)
+
+# All kinds of types a user can define
+# Abstract Type
+abstract type Abstract end
+
+# Primitive Type
+primitive type Primitive <: Unsigned 8 end
+
+# Composite Type
+struct Composite
+    foo
+    bar
+end
+
+# Mutable Composite Type
+mutable struct MutableComposite
+    foo
+    bar
+end
+
+# Parametric Types
+struct Parametric{T1, T2}
+    foo::T1
+    bar::T2
+end
+
+# Singleton Types
+struct Singleton end
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
-@test StructTypes.StructType(A) == StructTypes.NoStructType()
-@test StructTypes.StructType(A(1)) == StructTypes.NoStructType()
+@test StructTypes.StructType(A) == StructTypes.UnorderedStruct()
+@test StructTypes.StructType(A(1)) == StructTypes.UnorderedStruct()
+@test StructTypes.StructType(EmptyStruct) == StructTypes.SingletonType()
 
 @test StructTypes.names(A) == ()
 @test StructTypes.names(A(1)) == ()
@@ -45,6 +156,7 @@ end
 @test StructTypes.isempty(nothing)
 @test !StructTypes.isempty(A(1))
 @test !StructTypes.isempty(A(1), 1)
+@test !StructTypes.isempty(EmptyStruct)
 
 @test StructTypes.keywordargs(A) == NamedTuple()
 @test StructTypes.keywordargs(A(1)) == NamedTuple()
@@ -142,6 +254,54 @@ StructTypes.foreachfield(OmitEmp(nothing)) do i, nm, T, val
     counter += 1
 end
 @test counter == 0
+end
+
+# Make sure all builtin types have struct types
+@testset "Built in Julia types" begin
+
+    # tuples containing (module, property)
+    core_properties = map(x -> (Core,x), propertynames(Core))
+    base_properties = map(x -> (Base,x), propertynames(Base))
+
+    for (m, n) in [core_properties; base_properties]
+        prop = getproperty(m,n)
+        if typeof(prop) == DataType
+            struct_type = StructTypes.StructType(prop)
+            cond = prop <: builtin_type_mapping[StructTypes.StructType(prop)]
+            if !cond
+                @warn "Built in type $m.$n is incorrectly parsed as $(StructTypes.StructType(prop))"
+            end
+            @test cond
+        end
+    end
+
+end
+
+# Ensure all types a user can define have proper struct types
+@testset "User defined types" begin
+    # See https://docs.julialang.org/en/v1/manual/types/ for kinds of types
+
+    # Abstract Type
+    @test StructTypes.StructType(Abstract) == StructTypes.UnorderedStruct()
+
+    # Primitive Type
+    @test StructTypes.StructType(Primitive) == StructTypes.NumberType()
+
+    # Composite Type
+    @test StructTypes.StructType(Composite) == StructTypes.UnorderedStruct()
+
+    # Mutable Composite Type
+    @test StructTypes.StructType(MutableComposite) == StructTypes.UnorderedStruct()
+
+    # Type Unions
+    TypeUnion = Union{Composite, MutableComposite}
+    @test StructTypes.StructType(TypeUnion) == StructTypes.UnorderedStruct()
+
+    # Parametric Types
+    @test StructTypes.StructType(Parametric) == StructTypes.UnorderedStruct()
+
+    # Singleton Types
+    @test StructTypes.StructType(Singleton) == StructTypes.SingletonType()
 
 end
 
@@ -260,8 +420,6 @@ mutable struct DateStruct
 end
 DateStruct() = DateStruct(Date(0), DateTime(0), Time(0))
 Base.:(==)(a::DateStruct, b::DateStruct) = a.date == b.date && a.datetime == b.datetime && a.time == b.time
-
-struct EmptyStruct end
 
 @testset "convenience functions" begin
 
