@@ -457,6 +457,8 @@ construct(::Type{T}, ptr::Ptr{UInt8}, len::Int; kw...) where {T} = construct(T, 
 construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
 construct(::Type{T}, str::String; dateformat::Dates.DateFormat=Dates.default_format(T), kw...) where {T <: Dates.TimeType} = T(str, dateformat)
 
+construct(::Type{UUID}, arg; kw...) = UUID(arg)
+
 """
     StructTypes.StructType(::Type{T}) = StructTypes.NumberType()
 

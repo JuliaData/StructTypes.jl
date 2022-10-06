@@ -207,6 +207,7 @@ x = "apple"
 @test StructTypes.construct(Symbol, pointer(x), 5) == :apple
 x = "499beb72-22ea-11ea-3366-55749430b981"
 @test StructTypes.construct(UUID, pointer(x), 36) == UUID(x)
+@test StructTypes.construct(UUID, pointer(x), 36; dateformat=dateformat"mm-dd-yyyy") == UUID(x)
 @test StructTypes.construct(Date, "11-30-2019"; dateformat=dateformat"mm-dd-yyyy") == Date(2019, 11, 30)
 
 @test StructTypes.StructType(UInt8) == StructTypes.NumberType()
