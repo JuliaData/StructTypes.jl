@@ -155,3 +155,24 @@ StructTypes.mapfields!
 StructTypes.applyfield!
 StructTypes.applyfield
 ```
+
+## Macros
+
+The `StructType` of a type can be set using the following utility macros
+
+
+```@docs
+StructTypes.@Struct
+```
+
+And similarly for 
+- `StructTypes.@Mutable`
+- `StructTypes.@CustomStruct`
+- `StructTypes.@OrderedStruct`
+- `StructTypes.@AbstractType`
+- `StructTypes.@DictType`
+- `StructTypes.@ArrayType`
+- `StructTypes.@StringType`
+- `StructTypes.@NumberType`
+- `StructTypes.@BoolType`
+- `StructTypes.@NullType`
