@@ -129,6 +129,7 @@ struct Singleton end
 
 @testset "StructTypes" begin
 
+@test StructTypes.StructType(Union{}) == StructTypes.SingletonType()
 @test StructTypes.StructType(Union{Int, Missing}) == StructTypes.Struct()
 @test StructTypes.StructType(Any) == StructTypes.Struct()
 @test StructTypes.StructType(A) == StructTypes.UnorderedStruct()
