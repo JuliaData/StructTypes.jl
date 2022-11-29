@@ -201,6 +201,7 @@ y = DictWrapper(x)
 
 @test StructTypes.construct(Fruit, :apple) == apple
 @test StructTypes.construct(Fruit, "apple") == apple
+@test_throws ArgumentError StructTypes.construct(Fruit, "grapple")
 x = "apple"
 @test StructTypes.construct(Fruit, pointer(x), 5) == apple
 
@@ -721,6 +722,12 @@ StructTypes.defaults(::Type{C2}) = (b=2.5,)
             @test typeof(StructTypes.constructfrom(a, c)) == b
             @test StructTypes.constructfrom(a, c) == c
         end
+    end
+    @testset "constructfrom with Union" begin
+        dict = Dict(:a=>0, :b=>2.0, :c=>"c")
+        b = StructTypes.constructfrom(StructTypes.Struct(), Union{B, LotsOfFields}, dict)
+        @test typeof(b) == B
+        b = StructTypes.constructfrom(StructTypes.Struct(), Union{LotsOfFields, B}, dict)
     end
     @testset "constructfrom with subtypeclosure" begin
         dict = Dict(:type => ("Road", 2, 10), :make => "Spesh", :model => "Roubaix", :year=>2020)
