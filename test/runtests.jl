@@ -824,3 +824,35 @@ StructTypes.defaults(::Type{Defaultable}) = (b="b",)
     @test StructTypes.constructfrom(Defaultable, Dict(:a=>"a")) == Defaultable("a", "b")
     @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
 end
+
+# CustomStruct subtypes
+abstract type Vehicle2 end
+
+struct Car2 <: Vehicle2
+    make::String
+    model::String
+    seatingCapacity::Int
+    topSpeed::Float64
+end
+
+struct Truck2 <: Vehicle2
+    # type::String no need of this
+    make::String
+    model::String
+    payloadCapacity::Float64
+end
+
+StructTypes.StructType(::Type{Vehicle2}) = StructTypes.AbstractType()
+StructTypes.subtypekey(::Type{Vehicle2}) = :type
+StructTypes.subtypes(::Type{Vehicle2}) = (car=Car2, truck=Truck2)
+@register_struct_subtype Vehicle2 Car2
+@register_struct_subtype Vehicle2 Truck2
+
+@testset "register_struct_subtype" begin
+    nt = (; :type => :car, :make => "Mercedes-Benz", :model => "S500", :seatingCapacity => 5, :topSpeed => 250.1)
+    car = Car2(nt)
+    @test StructTypes.lower(car) === nt
+    @test StructTypes.lowertype(Car2) === typeof(nt)
+    @test typeof(car) == Car2
+    @test car.make == "Mercedes-Benz"
+end
