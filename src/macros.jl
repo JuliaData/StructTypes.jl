@@ -71,7 +71,7 @@ struct Car <: Vehicle
 end
 StructTypes.subtypekey(::Type{Vehicle}) = :type
 StructTypes.subtypes(::Type{Vehicle}) = (car=Car, truck=Truck)
-@register_struct_subtype Vehicle Car
+StructTypes.@register_struct_subtype Vehicle Car
 ```
 """
 macro register_struct_subtype(abstract_type, struct_subtype)

@@ -845,8 +845,8 @@ end
 StructTypes.StructType(::Type{Vehicle2}) = StructTypes.AbstractType()
 StructTypes.subtypekey(::Type{Vehicle2}) = :type
 StructTypes.subtypes(::Type{Vehicle2}) = (car=Car2, truck=Truck2)
-@register_struct_subtype Vehicle2 Car2
-@register_struct_subtype Vehicle2 Truck2
+StructTypes.@register_struct_subtype Vehicle2 Car2
+StructTypes.@register_struct_subtype Vehicle2 Truck2
 
 @testset "register_struct_subtype" begin
     nt = (; :type => :car, :make => "Mercedes-Benz", :model => "S500", :seatingCapacity => 5, :topSpeed => 250.1)
