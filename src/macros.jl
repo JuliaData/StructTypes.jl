@@ -100,7 +100,11 @@ end
 Macro to automatically generate the StructTypes interface for every subtype of `AbstractSuperType`.
 With the example of JSON3, this enables you to `JSON3.read(str, MyType)` where `MyType <: AbstractSuperType`.
 
-The assumption is made that the
+`@auto` assumes that all subtypes of the provided `AbstractSuperType` have the default constructors
+provided by Julia.  If this is not the case, you'll need to overload:
+
+    StructTypes.construct(::Type{MyType}, named_tuple::StructTypes.lowertype(MyType)) = MyType(...)
+
 """
 macro auto(T, subtypekey = :__type__)
     esc(quote
