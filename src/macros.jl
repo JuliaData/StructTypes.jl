@@ -125,7 +125,7 @@ macro auto(T, subtypekey = :__type__)
             end
 
             function StructTypes.construct(::Type{T}, nt::StructTypes.lowertype(Type{T})) where T <: $T
-                T(nt[fieldnames(T)]...)
+                T((nt[x] for x in fieldnames(T))...)
             end
 
             function StructTypes.subtypes(::Type{T}) where {T <: $T}
