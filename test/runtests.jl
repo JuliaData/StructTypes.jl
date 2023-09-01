@@ -23,12 +23,12 @@ end
 builtin_type_mapping = Dict(
     StructTypes.AbstractType() => Union{
         Core.IO,
-        Core.Number, 
+        Core.Number,
         Base.AbstractDisplay,
         Base.VERSION <= v"1.2" ? Union{} : Union{
             Base.AbstractMatch,
             Base.AbstractPattern,
-        } 
+        }
     },
     StructTypes.UnorderedStruct() => Union{
         Core.Any, # Might be too open
@@ -676,7 +676,7 @@ function bicycle_subtypes(t_sym::Symbol)
     isempty(t[1]) && t[2] == 1 && return Gravel # gravel bikes often have 1 x N chainring/cog setups
 end
 sub_type_closure = StructTypes.SubTypeClosure(bicycle_subtypes)
-StructTypes.subtypes(::Type{Bicycle}) = sub_type_closure 
+StructTypes.subtypes(::Type{Bicycle}) = sub_type_closure
 
 mutable struct C2
     a::Int
@@ -855,4 +855,40 @@ StructTypes.@register_struct_subtype Vehicle2 Truck2
     @test StructTypes.lowertype(Car2) === typeof(nt)
     @test typeof(car) == Car2
     @test car.make == "Mercedes-Benz"
+end
+
+
+# @auto
+abstract type AbstractSuperType end
+StructTypes.@auto AbstractSuperType
+
+abstract type AbstractSubType <: AbstractSuperType end
+struct AutoA <: AbstractSuperType
+    x::Int
+    y::String
+    z::Symbol
+end
+struct AutoB <: AbstractSubType
+    x::String
+    y::Symbol
+    z::Float64
+end
+struct AutoC{T, S} <: AbstractSubType
+    x::T
+    y::S
+    z::String
+end
+
+
+@testset "@auto" begin
+    @test StructTypes.StructType(AutoC) == StructTypes.AbstractType()
+    @test StructTypes.StructType(AutoC{Int,Int}) == StructTypes.CustomStruct()
+
+    a = AutoA(1, "2", :three)
+    b = AutoB("one", :two, 3.0)
+    c = AutoC(:one, "two", "three")
+
+    @test StructTypes.construct(AutoA, StructTypes.lower(a)) == a
+    @test StructTypes.construct(AutoB, StructTypes.lower(b)) == b
+    @test StructTypes.construct(AutoC{Symbol,String}, StructTypes.lower(c)) == c
 end
