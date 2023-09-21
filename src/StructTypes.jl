@@ -841,6 +841,9 @@ mappings will be applied, and the function will be passed the Julia field name.
             end
         end
     )
+    if !f_applied && haskey(defaults(T), nm)
+        setfield!(x, nm, defaults(T)[nm])
+    end
     return f_applied
 end
 
@@ -890,9 +893,6 @@ mappings will be applied, and the function will be passed the Julia field name.
             end
         end
     )
-    if !f_applied && haskey(defaults(T), nm)
-        setfield!(x, nm, defaults(T)[nm])
-    end
     return f_applied
 end
 
