@@ -856,3 +856,7 @@ StructTypes.@register_struct_subtype Vehicle2 Truck2
     @test typeof(car) == Car2
     @test car.make == "Mercedes-Benz"
 end
+
+@testset "struct type on complex" begin
+    @test StructTypes.StructType(ComplexF64) == StructTypes.Struct()
+end

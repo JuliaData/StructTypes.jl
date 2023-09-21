@@ -481,7 +481,7 @@ Similarly for serializing, `Float64(x::T)` will first be called before serializi
 """
 struct NumberType <: InterfaceType end
 
-StructType(::Type{<:Number}) = NumberType()
+StructType(::Type{<:Real}) = NumberType()
 numbertype(::Type{T}) where {T <: Real} = T
 numbertype(x) = Float64
 
