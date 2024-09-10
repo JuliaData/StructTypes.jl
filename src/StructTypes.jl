@@ -218,7 +218,7 @@ isempty(::Type{T}, x) where {T} = isempty(x) # generic fallback
 isempty(::Type{T}, x, i) where {T} = isempty(T, Core.getfield(x, i)) # generic fallback
 
 """
-    StructTypes.defaults(::Type{MyType}) = (:field_a=default_value, :field_b=>default_value)
+    StructTypes.defaults(::Type{MyType}) = (field_a=default_value, field_b=default_value)
 
 Define default arguments for various fields of `MyType`, which will be used to initialize the name-value
 dictionary used in `StructTypes.construct`.
