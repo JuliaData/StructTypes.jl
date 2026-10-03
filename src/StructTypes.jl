@@ -34,7 +34,7 @@ struct CustomStruct <: StructType end
 This is a required method for types declaring `StructTypes.CustomStruct`.
 Allows objects of type `T` to conveniently serialize/deserialize as another type, when their own
 structure/definition isn't significant. Useful for wrapper types. See also
-[`StructTypes.CustomStruct`](@ref) and [`StructType.lowertype`](@ref).
+[`StructTypes.CustomStruct`](@ref) and [`StructTypes.lowertype`](@ref).
 """
 function lower end
 
@@ -218,7 +218,7 @@ isempty(::Type{T}, x) where {T} = isempty(x) # generic fallback
 isempty(::Type{T}, x, i) where {T} = isempty(T, Core.getfield(x, i)) # generic fallback
 
 """
-    StructTypes.defaults(::Type{MyType}) = (:field_a=default_value, :field_b=>default_value)
+    StructTypes.defaults(::Type{MyType}) = (field_a=default_value, field_b=default_value)
 
 Define default arguments for various fields of `MyType`, which will be used to initialize the name-value
 dictionary used in `StructTypes.construct`.
@@ -847,11 +847,11 @@ end
 """
     StructTypes.applyfield(f, ::Type{T}, nm::Symbol) => Bool
 
-Convenience function for working with a `StructTypes.Mutable` object. For a given serialization name `nm`,
+Convenience function for working with the fields of type `T`. For a given serialization name `nm`,
 apply the function `f(i, name, FT; kw...)` to the field index `i`, field name `name`, field type `FT`, and
 any keyword arguments `kw` defined in `StructTypes.keywordargs`.
 Various StructType configurations are respected like keyword arguments, names, and exclusions.
-`applyfield` returns whether `f` was executed or not; if `nm` isn't a valid field name on `x`, `false`
+`applyfield` returns whether `f` was executed or not; if `nm` isn't a valid field name on `T`, `false`
 will be returned (important for applications where the input still needs to consume the field, like json parsing).
 Note that the input `nm` is treated as the serialization name, so any `StructTypes.names`
 mappings will be applied, and the function will be passed the Julia field name.
@@ -890,9 +890,6 @@ mappings will be applied, and the function will be passed the Julia field name.
             end
         end
     )
-    if !f_applied && haskey(defaults(T), nm)
-        setfield!(x, nm, defaults(T)[nm])
-    end
     return f_applied
 end
 

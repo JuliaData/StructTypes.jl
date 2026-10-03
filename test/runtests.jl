@@ -72,6 +72,7 @@ builtin_type_mapping = Dict(
         Base.Cwstring,
         Base.Regex,
         Base.VersionNumber,
+        UUID,
     },
     StructTypes.NumberType() => Union{
         Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
@@ -823,6 +824,59 @@ StructTypes.defaults(::Type{Defaultable}) = (b="b",)
 @testset "Defaultable" begin
     @test StructTypes.constructfrom(Defaultable, Dict(:a=>"a")) == Defaultable("a", "b")
     @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
+end
+
+struct DefaultedFields
+    value::Int
+end
+StructTypes.StructType(::Type{DefaultedFields}) = StructTypes.Struct()
+StructTypes.defaults(::Type{DefaultedFields}) = (value=10, extra=20)
+
+mutable struct MutableDefaultedFields
+    value::Int
+    MutableDefaultedFields() = new(42)
+end
+StructTypes.StructType(::Type{MutableDefaultedFields}) = StructTypes.Mutable()
+StructTypes.defaults(::Type{MutableDefaultedFields}) = (value=10, extra=20)
+
+mutable struct ExcludedDefaultedField
+    value::Int
+    ExcludedDefaultedField() = new(42)
+end
+StructTypes.StructType(::Type{ExcludedDefaultedField}) = StructTypes.Mutable()
+StructTypes.defaults(::Type{ExcludedDefaultedField}) = (value=10,)
+StructTypes.excludes(::Type{ExcludedDefaultedField}) = (:value,)
+StructTypes.names(::Type{ExcludedDefaultedField}) = ((:value, :wire_value),)
+
+@testset "field dispatch with defaults" begin
+    calls = Ref(0)
+    callback = (i, nm, FT) -> (calls[] += 1; 99)
+
+    @test StructTypes.applyfield(callback, DefaultedFields, :extra) === false
+    @test StructTypes.applyfield(callback, MutableDefaultedFields, :extra) === false
+    @test StructTypes.applyfield(callback, ExcludedDefaultedField, :wire_value) === false
+    @test calls[] == 0
+    @test StructTypes.applyfield(callback, DefaultedFields, :value) === true
+    @test calls[] == 1
+
+    x = MutableDefaultedFields()
+    @test StructTypes.applyfield!(callback, x, :extra) === false
+    @test x.value == 42
+    @test calls[] == 1
+    @test StructTypes.applyfield!(callback, x, :value) === true
+    @test x.value == 99
+    @test calls[] == 2
+
+    excluded = ExcludedDefaultedField()
+    @test StructTypes.applyfield!(callback, excluded, :wire_value) === false
+    @test excluded.value == 42
+    @test calls[] == 2
+
+    @test StructTypes.constructfrom(DefaultedFields, Dict{Symbol, Int}()).value == 10
+    @test StructTypes.constructfrom(DefaultedFields, Dict(:value=>3, :extra=>4)).value == 3
+    @test StructTypes.constructfrom(MutableDefaultedFields, Dict{Symbol, Int}()).value == 10
+    @test StructTypes.constructfrom(MutableDefaultedFields, Dict(:value=>3, :extra=>4)).value == 3
+    @test StructTypes.constructfrom(ExcludedDefaultedField, Dict(:wire_value=>3)).value == 42
 end
 
 # CustomStruct subtypes
