@@ -914,3 +914,36 @@ end
 @testset "struct type on complex" begin
     @test StructTypes.StructType(ComplexF64) == StructTypes.Struct()
 end
+
+struct CustomColumn{T, S}
+    values::Vector{T}
+end
+StructTypes.StructType(::Type{<:CustomColumn}) = StructTypes.CustomStruct()
+StructTypes.lowertype(::Type{<:CustomColumn}) = Dict{String, Any}
+StructTypes.lower(c::CustomColumn{T, S}) where {T, S} = Dict{String, Any}(
+    "type" => string(T), "storage" => string(S), "values" => c.values)
+
+struct DictionarySource{T}
+    value::T
+end
+StructTypes.StructType(::Type{<:DictionarySource}) = StructTypes.CustomStruct()
+StructTypes.lower(x::DictionarySource) = x.value
+
+@testset "dictionary conversion of custom sources" begin
+    c = CustomColumn{Int, Nothing}([1, 2])
+    d = StructTypes.constructfrom(Dict{String, Any}, c)
+    @test d == Dict("type" => string(Int), "storage" => "Nothing", "values" => [1, 2])
+    @test d["values"] === c.values
+
+    for value in (Dict("a" => 1, "b" => 2), (a=1, b=2)),
+        target in (Dict, AbstractDict, Dict{String, Any}, Dict{Symbol, Float64})
+        expected = StructTypes.constructfrom(target, value)
+        actual = StructTypes.constructfrom(target, DictionarySource(value))
+        @test actual == expected
+        @test typeof(actual) === typeof(expected)
+    end
+    @test StructTypes.constructfrom(Dict{String, Int}, DictionarySource(DictionarySource(Dict("a" => 1)))) == Dict("a" => 1)
+    @test StructTypes.constructfrom(Dict{String, Int}, DictionarySource(Dict{String, Int}())) == Dict{String, Int}()
+    @test_throws MethodError StructTypes.constructfrom(Dict, DictionarySource([1, 2]))
+    @test StructTypes.constructfrom(Any, c) === c
+end
