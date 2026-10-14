@@ -72,6 +72,7 @@ builtin_type_mapping = Dict(
         Base.Cwstring,
         Base.Regex,
         Base.VersionNumber,
+        UUID,
     },
     StructTypes.NumberType() => Union{
         Core.Number, # Should all of `Number` and its subtypes be Numbers by default?
@@ -823,6 +824,22 @@ StructTypes.defaults(::Type{Defaultable}) = (b="b",)
 @testset "Defaultable" begin
     @test StructTypes.constructfrom(Defaultable, Dict(:a=>"a")) == Defaultable("a", "b")
     @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
+end
+
+struct DefaultedFields
+    value::Int
+end
+StructTypes.StructType(::Type{DefaultedFields}) = StructTypes.Struct()
+StructTypes.defaults(::Type{DefaultedFields}) = (value=10, extra=20)
+
+@testset "applyfield with defaults for unknown names" begin
+    calls = Ref(0)
+    callback = (i, nm, FT) -> (calls[] += 1; 99)
+    @test StructTypes.applyfield(callback, DefaultedFields, :extra) === false
+    @test calls[] == 0
+    @test StructTypes.applyfield(callback, DefaultedFields, :value) === true
+    @test calls[] == 1
+    @test StructTypes.constructfrom(DefaultedFields, Dict{Symbol, Int}()).value == 10
 end
 
 # CustomStruct subtypes
