@@ -933,8 +933,8 @@ and respecting various serialization/deserialization names, keyword args, etc.
 
 Most typical use-case is construct a custom type `T` from an `obj::AbstractDict`, but
 `constructfrom` is fully generic, so the inverse is also supported (turning any custom
-struct into an `AbstractDict`). A `CustomStruct` source is converted to a dictionary
-through its `lower` method. For example, an external service may be providing JSON
+struct into an `AbstractDict`). A `CustomStruct` source is converted through its
+`lower` method. For example, an external service may be providing JSON
 data with an evolving schema; as opposed to trying a strict "typed parsing" like
 `JSON3.read(json, T)`, it may be preferrable to setup a local custom struct with just
 the desired properties and call `StructTypes.constructfrom(T, JSON3.read(json))`. This
@@ -1072,6 +1072,9 @@ function constructfrom!(::Mutable, x::T, ::Union{Struct, Mutable}, obj) where {T
     return x
 end
 
+constructfrom!(::Mutable, x::T, ::CustomStruct, obj) where {T} =
+    constructfrom!(x, lower(obj))
+
 constructfrom(::Struct, ::Type{T}, obj::S) where {T, S} =
     constructfrom(Struct(), T, StructType(S), obj)
 
@@ -1105,6 +1108,9 @@ end
 
 constructfrom(::Struct, ::Type{T}, ::Union{Struct, Mutable}, obj) where {T} =
     construct(StructClosure(obj), T)
+
+constructfrom(::Struct, ::Type{T}, ::CustomStruct, obj) where {T} =
+    constructfrom(T, lower(obj))
 
 struct TupleClosure{T}
     obj::T
