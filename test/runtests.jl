@@ -826,6 +826,18 @@ StructTypes.defaults(::Type{Defaultable}) = (b="b",)
     @test StructTypes.constructfrom(Defaultable, (a="a", b="c")) == Defaultable("a", "c")
 end
 
+@eval struct WideDefaults
+    $((:($(Symbol(:x, i))::Int) for i in 1:34)...)
+end
+StructTypes.defaults(::Type{WideDefaults}) = (x1=-1, x34=-34)
+@testset "construct(values, T) applies defaults to every missing field" begin
+    vals = Vector{Any}(undef, 34)
+    vals[2:33] .= 2:33
+    x = StructTypes.construct(vals, WideDefaults)
+    @test x.x1 == -1
+    @test x.x34 == -34
+end
+
 struct DefaultedFields
     value::Int
 end
