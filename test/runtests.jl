@@ -244,6 +244,12 @@ v = v"1.2.3"
 
 # 47
 @test StructTypes.construct(Nothing, nothing) === nothing
+
+# types with no fields, including the empty NamedTuple
+@test StructTypes.construct((i, nm, FT) -> error("no fields"), NamedTuple{(), Tuple{}}) === NamedTuple()
+@test StructTypes.construct(Any[], NamedTuple{(), Tuple{}}) === NamedTuple()
+@test StructTypes.construct(Any[], Tuple{}) === ()
+@test StructTypes.constructfrom(NamedTuple{(), Tuple{}}, Dict{String, Any}()) === NamedTuple()
 x = Dict("hey" => "ho")
 @test StructTypes.construct(Dict{String, String}, x) === x
 
