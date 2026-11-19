@@ -610,7 +610,7 @@ Note that any `StructTypes.names` mappings are applied, as well as field-specifi
 """
 @inline function construct(f, ::Type{T}) where {T}
     N = fieldcount(T)
-    N == 0 && return T()
+    N == 0 && return T <: NamedTuple ? T(()) : T()
     nms = names(T)
     kwargs = keywordargs(T)
     constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
@@ -895,7 +895,7 @@ end
 
 @inline function construct(values::Vector{Any}, ::Type{T}) where {T}
     N = fieldcount(T)
-    N == 0 && return T()
+    N == 0 && return T <: NamedTuple ? T(()) : T()
     nms = names(T)
     kwargs = keywordargs(T)
     constructor = T <: Tuple ? tuple : T <: NamedTuple ? ((x...) -> T(tuple(x...))) : T
