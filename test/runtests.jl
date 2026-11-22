@@ -128,6 +128,13 @@ end
 # Singleton Types
 struct Singleton end
 
+# A set type whose constructor takes a keyword
+struct KeywordSet <: AbstractSet{Int}
+    elements::Set{Int}
+    tag::Symbol
+end
+KeywordSet(x::AbstractVector; tag::Symbol=:none) = KeywordSet(Set{Int}(x), tag)
+
 @testset "StructTypes" begin
 
 @test StructTypes.StructType(Union{}) == StructTypes.SingletonType()
@@ -220,6 +227,8 @@ df = dateformat"yyyy"
 @test StructTypes.construct(Set{Int}, [1, 2, 2]; dateformat=df) == Set([1, 2])
 @test StructTypes.construct(Set, Any[1, "a"]; dateformat=df) == Set(Any[1, "a"])
 @test StructTypes.construct(BitSet, [3, 1]; dateformat=df) == BitSet([1, 3])
+# other set types still receive the keywords
+@test StructTypes.construct(KeywordSet, [1]; tag=:given).tag === :given
 
 @test StructTypes.StructType(UInt8) == StructTypes.NumberType()
 @test StructTypes.StructType(Int8) == StructTypes.NumberType()
