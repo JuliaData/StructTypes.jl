@@ -459,6 +459,10 @@ construct(::Type{Symbol}, ptr::Ptr{UInt8}, len::Int; kw...) = _symbol(ptr, len)
 construct(::Type{T}, str::String; dateformat::Dates.DateFormat=Dates.default_format(T), kw...) where {T <: Dates.TimeType} = T(str, dateformat)
 
 construct(::Type{UUID}, arg; kw...) = UUID(arg)
+# these Base constructors take no keywords, so read keywords (like `dateformat`) are dropped;
+# other set types keep the default, which passes the keywords on
+construct(::Type{T}, str::String; kw...) where {T <: Union{Symbol, VersionNumber, Regex}} = T(str)
+construct(::Type{T}, x::AbstractVector; kw...) where {T <: Union{Set, BitSet}} = T(x)
 
 """
     StructTypes.StructType(::Type{T}) = StructTypes.NumberType()
